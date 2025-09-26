@@ -197,6 +197,24 @@
   max-width: 100%;
 }
 
+/* Enforce containment at the page container level to prevent any overflow */
+.page-module__JnUBza__container {
+  max-width: 100%;
+  overflow-x: hidden; /* prevent the white card from extending the viewport */
+}
+
+.page-module__JnUBza__container .analytics-card {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.page-module__JnUBza__container .analytics-chart-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto; /* inner scroll */
+  overflow-y: hidden;
+}
+
 /* Line Chart Styles */
 .line-chart-container {
   margin-bottom: 24px;

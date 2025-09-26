@@ -293,31 +293,41 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const key = bucketKey(dt, granularity);
     let perBucket = seriesProductMap.get(key);
     if (!perBucket) { perBucket = new Map(); seriesProductMap.set(key, perBucket); }
+    // Check for line items in different properties (case sensitivity issues)
+    const lineItems = inv.lineItems || (inv as any).LineItems || [];
+    
+    // Debug the raw invoice structure
     console.log('📋 [PROCESSING INVOICE]', { 
       id: inv.invoiceID || inv.invoiceNumber, 
       date: inv.date, 
-      type: inv.type, 
-      lineItemsCount: Array.isArray(inv.lineItems) ? inv.lineItems.length : 0,
-      sampleLineItems: Array.isArray(inv.lineItems) ? inv.lineItems.slice(0, 2).map(li => ({
-        itemCode: li.itemCode,
-        description: li.description,
-        quantity: li.quantity,
-        unitAmount: li.unitAmount,
-        lineAmount: li.lineAmount
+      type: inv.type,
+      total: inv.total,
+      rawInvoice: JSON.stringify(inv).substring(0, 500), // Show first 500 chars of raw invoice
+      lineItemsCount: Array.isArray(lineItems) ? lineItems.length : 0,
+      sampleLineItems: Array.isArray(lineItems) ? lineItems.slice(0, 2).map(li => ({
+        itemCode: li.itemCode || li.ItemCode,
+        description: li.description || li.Description,
+        quantity: li.quantity || li.Quantity,
+        unitAmount: li.unitAmount || li.UnitAmount,
+        lineAmount: li.lineAmount || li.LineAmount
       })) : []
     });
     
-    if (Array.isArray(inv.lineItems)) {
-      for (const li of inv.lineItems as LineItemLite[]) {
-        const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
-        let pid = rawCode || String(li.description || 'unknown');
+    if (Array.isArray(lineItems)) {
+      for (const li of lineItems as LineItemLite[]) {
+        // Handle case-insensitive property names
+        const itemCode = li.itemCode || (li as any).ItemCode;
+        const description = li.description || (li as any).Description;
+        
+        const rawCode = (itemCode ? String(itemCode) : '').toUpperCase();
+        let pid = rawCode || String(description || 'unknown');
         let itemInfo = rawCode ? itemsIndex.get(rawCode) : undefined;
-        let title = itemInfo?.name || String(li.description || li.itemCode || 'Item');
+        let title = itemInfo?.name || String(description || itemCode || 'Item');
         if (itemInfo) {
           productItemMatches++;
         } else {
           // Heuristic by normalized description to item name
-          const normDesc = normalizeText(li.description || '');
+          const normDesc = normalizeText(description || '');
           if (normDesc) {
             const nameHit = itemsNameIndex.get(normDesc);
             if (nameHit) {
@@ -328,25 +338,33 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
             }
           }
         }
-        const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
-        let q = li.quantity;
+        // Handle case-insensitive property names for quantity and amounts
+        const quantity = li.quantity !== undefined ? li.quantity : (li as any).Quantity;
+        const lineAmount = li.lineAmount !== undefined ? li.lineAmount : (li as any).LineAmount;
+        const unitAmount = li.unitAmount !== undefined ? li.unitAmount : (li as any).UnitAmount;
+        const taxAmount = li.taxAmount !== undefined ? li.taxAmount : (li as any).TaxAmount;
+        
+        const hasAmount = typeof lineAmount === 'number' || typeof unitAmount === 'number';
+        let q = quantity;
         if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }
         const liQty = sign * Number(q ?? 0);
         
         console.log('🔍 [LINE ITEM PROCESSING]', {
-          itemCode: li.itemCode,
-          description: li.description,
-          originalQty: li.quantity,
+          itemCode,
+          description,
+          originalQty: quantity,
           inferredQty: q,
+          lineAmount,
+          unitAmount,
           hasAmount,
           liQty,
           pid,
           title,
           matchType: itemInfo ? 'exact' : 'none'
         });
-        const fallbackAmt = (li.unitAmount ?? 0) * (li.quantity ?? 0);
-        const chosenAmt = li.lineAmount ?? fallbackAmt;
-        const liSales = sign * (Number(chosenAmt || 0) - Number(li.taxAmount ?? 0));
+        const fallbackAmt = (unitAmount ?? 0) * (quantity ?? 0);
+        const chosenAmt = lineAmount ?? fallbackAmt;
+        const liSales = sign * (Number(chosenAmt || 0) - Number(taxAmount ?? 0));
         // totals per product
         const agg = productMap.get(pid) || { title, qty: 0, sales: 0 };
         agg.qty += liQty;

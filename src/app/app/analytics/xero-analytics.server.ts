@@ -66,7 +66,10 @@ export type XeroAnalyticsResult = {
   // Comparisons
   mom: Array<{ period: string; curr: { qty: number; sales: number }; prev: { qty: number; sales: number } }>;
   yoy: Array<{ month: string; curr: { qty: number; sales: number }; prev: { qty: number; sales: number } }>;
-  diagnostics: { fetched: number; included: number; excludedNonSales: number; excludedStatus: number };
+  diagnostics: { fetched: number; included: number; excludedNonSales: number; excludedStatus: number; inferredQtyLines: number };
+  monthlyTotals: Array<{ key: string; label: string; qty: number; sales: number }>;
+  monthlyDict: Record<string, { label: string; qty: number; sales: number }>;
+  credits: { count: number; qty: number; sales: number };
 };
 
 function startOfWeekUTC(d: Date) {
@@ -172,16 +175,26 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   });
 
   const currency = invoices[0]?.currencyCode;
+  let inferredQtyLines = 0;
+  let creditCount = 0;
+  let creditQty = 0;
+  let creditSales = 0;
 
   // Aggregate by bucket
   const map = new Map<string, { quantity: number; sales: number }>();
   for (const inv of invoices) {
     const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
+    if (sign === -1) creditCount++;
     const dt = new Date(inv.date ?? Date.now());
     const key = bucketKey(dt, granularity);
     const current = map.get(key) || { quantity: 0, sales: 0 };
     const qty = Array.isArray(inv.lineItems)
-      ? inv.lineItems.reduce((s: number, li: LineItemLite) => s + sign * Number(li?.quantity ?? 0), 0)
+      ? inv.lineItems.reduce((s: number, li: LineItemLite) => {
+          const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
+          let q = li.quantity;
+          if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }
+          return s + sign * Number(q ?? 0);
+        }, 0)
       : 0;
     // Pre-tax line amount: (lineAmount or unit*qty) minus taxAmount if present
     const totalLinesPretax = Array.isArray(inv.lineItems)
@@ -205,6 +218,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     current.quantity += qty;
     current.sales += total;
     map.set(key, current);
+    if (sign === -1) {
+      creditQty += qty; // qty already carries sign
+      creditSales += total; // total already carries sign
+    }
   }
 
   // Build series sorted by key
@@ -249,7 +266,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
       for (const li of inv.lineItems as LineItemLite[]) {
         const pid = String(li.itemCode || li.description || 'unknown');
         const title = String(li.description || li.itemCode || 'Item');
-        const liQty = sign * Number(li.quantity ?? 0);
+        const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
+        let q = li.quantity;
+        if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }
+        const liQty = sign * Number(q ?? 0);
         const fallbackAmt = (li.unitAmount ?? 0) * (li.quantity ?? 0);
         const chosenAmt = li.lineAmount ?? fallbackAmt;
         const liSales = sign * (Number(chosenAmt || 0) - Number(li.taxAmount ?? 0));
@@ -292,7 +312,14 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const d = new Date(inv.date ?? Date.now());
     const mk = monthKey(d);
     const cur = monthlyMap.get(mk) || { qty: 0, sales: 0 };
-    const q = Array.isArray(inv.lineItems) ? (inv.lineItems as LineItemLite[]).reduce((s, li) => s + sign * Number(li.quantity ?? 0), 0) : 0;
+    const q = Array.isArray(inv.lineItems)
+      ? (inv.lineItems as LineItemLite[]).reduce((s, li) => {
+          const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
+          let qq = li.quantity;
+          if ((qq == null || qq === 0) && hasAmount) { inferredQtyLines++; qq = 1; }
+          return s + sign * Number(qq ?? 0);
+        }, 0)
+      : 0;
     cur.qty += q;
     const sumLines = Array.isArray(inv.lineItems)
       ? (inv.lineItems as LineItemLite[]).reduce((s, li) => {
@@ -314,6 +341,11 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     monthlyMap.set(mk, cur);
   }
   const sortedMonths = Array.from(monthlyMap.keys()).sort();
+  function monthLabel(ym: string) {
+    const [y, m] = ym.split('-').map((v) => Number(v));
+    const dt = new Date(Date.UTC(y, (m-1), 1));
+    return dt.toLocaleString('en', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  }
   const mom = [] as XeroAnalyticsResult['mom'];
   for (let i = 1; i < sortedMonths.length; i++) {
     const a = sortedMonths[i-1];
@@ -324,10 +356,20 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   for (const mk of sortedMonths) {
     const [y, m] = mk.split('-').map((v) => Number(v));
     const prevK = `${y-1}-${String(m).padStart(2,'0')}`;
-    if (monthlyMap.has(prevK)) {
-      yoy.push({ month: `${mk}`, curr: monthlyMap.get(mk)!, prev: monthlyMap.get(prevK)! });
-    }
+    const curr = monthlyMap.get(mk)!;
+    const prev = monthlyMap.get(prevK) ?? { qty: 0, sales: 0 };
+    yoy.push({ month: `${mk}`, curr, prev });
   }
+
+  // Monthly totals array and dictionary for UI selections
+  const monthlyTotals = sortedMonths.map((k) => {
+    const t = monthlyMap.get(k)!;
+    return { key: k, label: monthLabel(k), qty: t.qty, sales: t.sales };
+  });
+  const monthlyDict = monthlyTotals.reduce<Record<string, { label: string; qty: number; sales: number }>>((acc, m) => {
+    acc[m.key] = { label: m.label, qty: m.qty, sales: m.sales };
+    return acc;
+  }, {});
 
   return {
     filters: { preset, start: fmtYMD(start), end: fmtYMD(end), granularity },
@@ -342,6 +384,9 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     salesByProduct,
     mom,
     yoy,
-    diagnostics: { fetched: fetchedAll.length, included: invoices.length, excludedNonSales, excludedStatus },
+    diagnostics: { fetched: fetchedAll.length, included: invoices.length, excludedNonSales, excludedStatus, inferredQtyLines },
+    monthlyTotals,
+    monthlyDict,
+    credits: { count: creditCount, qty: creditQty, sales: creditSales },
   };
 }

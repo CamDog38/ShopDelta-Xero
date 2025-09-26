@@ -262,6 +262,21 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   const productMap = new Map<string, { title: string; qty: number; sales: number }>();
   const seriesProductMap = new Map<string, Map<string, { qty: number; sales: number; title: string }>>();
   let productItemMatches = 0;
+  let productHeuristicMatches = 0;
+
+  function normalizeText(s?: string) {
+    return (s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Build name index for heuristic matching when itemCode is missing
+  const itemsNameIndex = new Map<string, { code?: string; name?: string; isTracked?: boolean }>();
+  for (const [codeUpper, it] of itemsIndex.entries()) {
+    if (it.name) itemsNameIndex.set(normalizeText(it.name), it);
+  }
   for (const inv of invoices) {
     const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
     const dt = new Date(inv.date ?? Date.now());
@@ -271,10 +286,24 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     if (Array.isArray(inv.lineItems)) {
       for (const li of inv.lineItems as LineItemLite[]) {
         const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
-        const pid = rawCode || String(li.description || 'unknown');
-        const itemInfo = rawCode ? itemsIndex.get(rawCode) : undefined;
-        if (itemInfo) productItemMatches++;
-        const title = itemInfo?.name || String(li.description || li.itemCode || 'Item');
+        let pid = rawCode || String(li.description || 'unknown');
+        let itemInfo = rawCode ? itemsIndex.get(rawCode) : undefined;
+        let title = itemInfo?.name || String(li.description || li.itemCode || 'Item');
+        if (itemInfo) {
+          productItemMatches++;
+        } else {
+          // Heuristic by normalized description to item name
+          const normDesc = normalizeText(li.description || '');
+          if (normDesc) {
+            const nameHit = itemsNameIndex.get(normDesc);
+            if (nameHit) {
+              productHeuristicMatches++;
+              itemInfo = nameHit;
+              title = nameHit.name || title;
+              pid = String(nameHit.code || title);
+            }
+          }
+        }
         const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
         let q = li.quantity;
         if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }

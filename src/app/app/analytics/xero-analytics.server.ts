@@ -244,18 +244,24 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
 
   // Items (products)
   let topItems: Array<{ code?: string; name?: string; isTracked?: boolean }> = [];
+  const itemsIndex = new Map<string, { code?: string; name?: string; isTracked?: boolean }>();
   try {
     const itemsRes = await requestWithRetry(() => xero.accountingApi.getItems(session.tenantId));
-    topItems = ((itemsRes.body?.items ?? []) as unknown as ItemLite[]).map((it) => ({
+    const allItems = ((itemsRes.body?.items ?? []) as unknown as ItemLite[]);
+    topItems = allItems.map((it) => ({
       code: it.code,
       name: it.name,
       isTracked: Boolean(it.isTrackedAsInventory),
     }));
+    for (const it of allItems) {
+      if (it.code) itemsIndex.set(String(it.code).toUpperCase(), { code: it.code, name: it.name, isTracked: Boolean(it.isTrackedAsInventory) });
+    }
   } catch {}
 
   // Product breakdown from invoices/line items within range
   const productMap = new Map<string, { title: string; qty: number; sales: number }>();
   const seriesProductMap = new Map<string, Map<string, { qty: number; sales: number; title: string }>>();
+  let productItemMatches = 0;
   for (const inv of invoices) {
     const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
     const dt = new Date(inv.date ?? Date.now());
@@ -264,8 +270,11 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     if (!perBucket) { perBucket = new Map(); seriesProductMap.set(key, perBucket); }
     if (Array.isArray(inv.lineItems)) {
       for (const li of inv.lineItems as LineItemLite[]) {
-        const pid = String(li.itemCode || li.description || 'unknown');
-        const title = String(li.description || li.itemCode || 'Item');
+        const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
+        const pid = rawCode || String(li.description || 'unknown');
+        const itemInfo = rawCode ? itemsIndex.get(rawCode) : undefined;
+        if (itemInfo) productItemMatches++;
+        const title = itemInfo?.name || String(li.description || li.itemCode || 'Item');
         const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
         let q = li.quantity;
         if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }

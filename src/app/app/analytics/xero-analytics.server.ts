@@ -66,7 +66,7 @@ export type XeroAnalyticsResult = {
   // Comparisons
   mom: Array<{ period: string; curr: { qty: number; sales: number }; prev: { qty: number; sales: number } }>;
   yoy: Array<{ month: string; curr: { qty: number; sales: number }; prev: { qty: number; sales: number } }>;
-  diagnostics: { fetched: number; included: number; excludedNonSales: number; excludedStatus: number; inferredQtyLines: number };
+  diagnostics: { fetched: number; included: number; excludedNonSales: number; excludedStatus: number; inferredQtyLines: number; productCodeMatches?: number; productHeuristicMatches?: number };
   monthlyTotals: Array<{ key: string; label: string; qty: number; sales: number }>;
   monthlyDict: Record<string, { label: string; qty: number; sales: number }>;
   credits: { count: number; qty: number; sales: number };
@@ -116,6 +116,7 @@ function bucketKey(d: Date, g: Granularity) {
 }
 
 export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<XeroAnalyticsResult> {
+  console.log('[analytics] start getXeroAnalytics', input);
   const session = await getXeroSession();
   if (!session) throw new Error('No Xero session');
   const xero = (getXeroClient() as unknown) as XeroClientLike;
@@ -154,11 +155,14 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }
 
   const { start, end, granularity, preset } = normalizeRange(input);
+  console.log('[analytics] normalized range', { preset, start: start.toISOString(), end: end.toISOString(), granularity });
 
   // Fetch invoices within a broad range. Xero API doesn't support complex filters in all SDK versions,
   // so we fetch a reasonable number and filter in memory for the example.
+  console.log('[analytics] fetching invoices');
   const invRes = await requestWithRetry(() => xero.accountingApi.getInvoices(session.tenantId));
   const fetchedAll = ((invRes.body?.invoices ?? []) as unknown as InvoiceLite[]);
+  console.log('[analytics] fetched invoices count', fetchedAll.length);
   let excludedNonSales = 0;
   let excludedStatus = 0;
   const invoices = fetchedAll.filter((inv) => {
@@ -174,6 +178,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     if (!isGoodStatus) { excludedStatus++; return false; }
     return dt >= start && dt <= end;
   });
+  console.log('[analytics] included invoices after filters', { included: invoices.length, excludedNonSales, excludedStatus });
 
   const currency = invoices[0]?.currencyCode;
   let inferredQtyLines = 0;
@@ -257,6 +262,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     for (const it of allItems) {
       if (it.code) itemsIndex.set(String(it.code).toUpperCase(), { code: it.code, name: it.name, isTracked: Boolean(it.isTrackedAsInventory) });
     }
+    console.log('[analytics] fetched items', { count: allItems.length });
   } catch {}
 
   // Product breakdown from invoices/line items within range
@@ -413,6 +419,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     monthlyMap.set(mk, cur);
   }
   const sortedMonths = Array.from(monthlyMap.keys()).sort();
+  console.log('[analytics] monthly map complete', { months: sortedMonths.length });
   function monthLabel(ym: string) {
     const [y, m] = ym.split('-').map((v) => Number(v));
     const dt = new Date(Date.UTC(y, (m-1), 1));
@@ -456,7 +463,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     salesByProduct,
     mom,
     yoy,
-    diagnostics: { fetched: fetchedAll.length, included: invoices.length, excludedNonSales, excludedStatus, inferredQtyLines },
+    diagnostics: { fetched: fetchedAll.length, included: invoices.length, excludedNonSales, excludedStatus, inferredQtyLines, productCodeMatches: productItemMatches, productHeuristicMatches },
     monthlyTotals,
     monthlyDict,
     credits: { count: creditCount, qty: creditQty, sales: creditSales },

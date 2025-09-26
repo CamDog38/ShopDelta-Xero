@@ -21,12 +21,12 @@ export async function GET(request: Request) {
     // Fetch items
     const itemsRes = await xero.accountingApi.getItems(session.tenantId);
     const items = itemsRes?.body?.items ?? [];
-    const itemsIndex = new Map();
-    const itemsNameIndex = new Map();
+    const itemsIndex = new Map<string, any>();
+    const itemsNameIndex = new Map<string, any>();
     
-    function normalizeText(s: string | undefined): string {
+    const normalizeText = (s: string | undefined): string => {
       return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    }
+    };
     
     for (const it of items) {
       if (it.code) itemsIndex.set(String(it.code).toUpperCase(), { code: it.code, name: it.name });

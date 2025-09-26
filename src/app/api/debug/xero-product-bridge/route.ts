@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const itemsIndex = new Map();
     const itemsNameIndex = new Map();
     
-    function normalizeText(s) {
+    function normalizeText(s: string | undefined): string {
       return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
     }
     
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const raw = invRes?.body?.invoices ?? [];
 
     // Filter invoices
-    const invoices = raw.filter((inv) => {
+    const invoices = raw.filter((inv: any) => {
       if (!start && !end) return true;
       if (!inv.date) return false;
       const dt = new Date(inv.date);

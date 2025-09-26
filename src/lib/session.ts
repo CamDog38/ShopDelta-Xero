@@ -8,7 +8,7 @@ const COOKIE_NAME = 'xero_auth';
 const TENANT_COOKIE = 'xero_tenant';
 
 export type XeroSession = {
-  tokenSet: any;
+  tokenSet: Record<string, unknown>;
   tenantId: string;
 };
 
@@ -121,7 +121,7 @@ export function getSessionForTenant(tenantId: string): XeroSession | null {
 }
 
 // Persist an updated tokenSet into the current session file (when tokens are refreshed)
-export async function updateCurrentSessionTokenSet(tokenSet: any): Promise<void> {
+export async function updateCurrentSessionTokenSet(tokenSet: Record<string, unknown>): Promise<void> {
   try {
     const store = await cookies();
     const sessionId = store.get(COOKIE_NAME)?.value;

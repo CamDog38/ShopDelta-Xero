@@ -11,6 +11,41 @@ export type XeroAnalyticsFilters = {
   granularity?: Granularity;
 };
 
+// Lightweight internal types limited to fields we actually use from the Xero SDK
+type LineItemLite = {
+  itemCode?: string;
+  description?: string;
+  quantity?: number;
+  lineAmount?: number;
+};
+type InvoiceLite = {
+  date?: string;
+  lineItems?: LineItemLite[];
+  total?: number;
+  currencyCode?: string;
+  invoiceID?: string;
+  invoiceNumber?: string;
+  status?: string;
+};
+type ItemLite = {
+  code?: string;
+  name?: string;
+  isTrackedAsInventory?: boolean;
+};
+
+// Minimal Xero client shape used by this module
+type XeroClientLike = {
+  setTokenSet?: (tokenSet: Record<string, unknown>) => void;
+  refreshToken?: () => Promise<unknown> | unknown;
+  refreshTokenSet?: () => Promise<unknown> | unknown;
+  readTokenSet?: () => Record<string, unknown> | Promise<Record<string, unknown> | undefined> | undefined;
+  tokenSet?: Record<string, unknown>;
+  accountingApi: {
+    getInvoices: (tenantId: string) => Promise<{ body?: { invoices?: unknown[] } }>;
+    getItems: (tenantId: string) => Promise<{ body?: { items?: unknown[] } }>;
+  };
+};
+
 export type XeroAnalyticsResult = {
   filters: { preset: Preset; start: string; end: string; granularity: Granularity };
   totals: { qty: number; sales: number; currency?: string };
@@ -74,7 +109,7 @@ function bucketKey(d: Date, g: Granularity) {
 export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<XeroAnalyticsResult> {
   const session = await getXeroSession();
   if (!session) throw new Error('No Xero session');
-  const xero = getXeroClient();
+  const xero = (getXeroClient() as unknown) as XeroClientLike;
   try {
     // @ts-ignore
     if (typeof xero.setTokenSet === 'function') {
@@ -86,20 +121,20 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   async function requestWithRetry<T>(fn: () => Promise<T>): Promise<T> {
     try {
       return await fn();
-    } catch (e: any) {
-      const status = e?.response?.statusCode || e?.response?.status || e?.statusCode;
-      const unauthorized = status === 401 || String(e?.response?.body?.Title || '').toLowerCase().includes('unauthorized');
+    } catch (e: unknown) {
+      const err = e as { response?: { statusCode?: number; status?: number; body?: { Title?: string } } };
+      const status = err?.response?.statusCode || err?.response?.status;
+      const unauthorized = status === 401 || String(err?.response?.body?.Title || '').toLowerCase().includes('unauthorized');
       if (unauthorized) {
         try {
           // Attempt token refresh if SDK exposes it
-          const anyX = xero as any;
-          if (typeof anyX.refreshToken === 'function') {
-            await anyX.refreshToken();
-          } else if (typeof anyX.refreshTokenSet === 'function') {
-            await anyX.refreshTokenSet();
+          if (typeof xero.refreshToken === 'function') {
+            await xero.refreshToken();
+          } else if (typeof xero.refreshTokenSet === 'function') {
+            await xero.refreshTokenSet();
           }
           // Persist refreshed tokenSet if accessible
-          const ts = anyX.tokenSet || (typeof anyX.readTokenSet === 'function' ? await anyX.readTokenSet() : undefined);
+          const ts = xero.tokenSet || (typeof xero.readTokenSet === 'function' ? await xero.readTokenSet() : undefined);
           if (ts) await updateCurrentSessionTokenSet(ts);
         } catch {}
         // Retry once after refresh attempt
@@ -114,25 +149,25 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   // Fetch invoices within a broad range. Xero API doesn't support complex filters in all SDK versions,
   // so we fetch a reasonable number and filter in memory for the example.
   const invRes = await requestWithRetry(() => xero.accountingApi.getInvoices(session.tenantId));
-  const invoices = (invRes.body?.invoices ?? []).filter((inv: any) => {
-    const d = inv.date || inv.Date;
+  const invoices = ((invRes.body?.invoices ?? []) as unknown as InvoiceLite[]).filter((inv) => {
+    const d = inv.date;
     const dt = d ? new Date(d) : null;
     if (!dt) return false;
     return dt >= start && dt <= end;
   });
 
-  const currency = (invoices[0] as any)?.currencyCode as string | undefined;
+  const currency = invoices[0]?.currencyCode;
 
   // Aggregate by bucket
   const map = new Map<string, { quantity: number; sales: number }>();
   for (const inv of invoices) {
-    const dt = new Date((inv as any).date);
+    const dt = new Date(inv.date ?? Date.now());
     const key = bucketKey(dt, granularity);
     const current = map.get(key) || { quantity: 0, sales: 0 };
-    const qty = Array.isArray((inv as any).lineItems)
-      ? (inv as any).lineItems.reduce((s: number, li: any) => s + Number(li?.quantity ?? 0), 0)
+    const qty = Array.isArray(inv.lineItems)
+      ? inv.lineItems.reduce((s: number, li: LineItemLite) => s + Number(li?.quantity ?? 0), 0)
       : 0;
-    const total = Number((inv as any).total ?? 0);
+    const total = Number(inv.total ?? 0);
     current.quantity += qty;
     current.sales += total;
     map.set(key, current);
@@ -146,21 +181,21 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
 
   // Recent invoices (all in range, newest first)
   const recentInvoices = invoices
-    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .map((inv: any) => ({
+    .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
+    .map((inv) => ({
       id: String(inv.invoiceID || inv.invoiceNumber || ''),
       number: inv.invoiceNumber,
       status: inv.status,
       total: Number(inv.total ?? 0),
       currency: inv.currencyCode,
-      date: fmtYMD(new Date(inv.date)),
+      date: inv.date ? fmtYMD(new Date(inv.date)) : undefined,
     }));
 
   // Items (products)
   let topItems: Array<{ code?: string; name?: string; isTracked?: boolean }> = [];
   try {
     const itemsRes = await requestWithRetry(() => xero.accountingApi.getItems(session.tenantId));
-    topItems = (itemsRes.body?.items ?? []).map((it: any) => ({
+    topItems = ((itemsRes.body?.items ?? []) as unknown as ItemLite[]).map((it) => ({
       code: it.code,
       name: it.name,
       isTracked: Boolean(it.isTrackedAsInventory),
@@ -171,12 +206,12 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   const productMap = new Map<string, { title: string; qty: number; sales: number }>();
   const seriesProductMap = new Map<string, Map<string, { qty: number; sales: number; title: string }>>();
   for (const inv of invoices) {
-    const dt = new Date((inv as any).date ?? Date.now());
+    const dt = new Date(inv.date ?? Date.now());
     const key = bucketKey(dt, granularity);
     let perBucket = seriesProductMap.get(key);
     if (!perBucket) { perBucket = new Map(); seriesProductMap.set(key, perBucket); }
     if (Array.isArray(inv.lineItems)) {
-      for (const li of inv.lineItems as any[]) {
+      for (const li of inv.lineItems as LineItemLite[]) {
         const pid = String(li.itemCode || li.description || 'unknown');
         const title = String(li.description || li.itemCode || 'Item');
         const liQty = Number(li.quantity ?? 0);
@@ -216,10 +251,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   function monthKey(d: Date) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`; }
   const monthlyMap = new Map<string, { qty: number; sales: number }>();
   for (const inv of invoices) {
-    const d = new Date((inv as any).date ?? Date.now());
+    const d = new Date(inv.date ?? Date.now());
     const mk = monthKey(d);
     const cur = monthlyMap.get(mk) || { qty: 0, sales: 0 };
-    const q = Array.isArray(inv.lineItems) ? (inv.lineItems as any[]).reduce((s, li) => s + Number(li.quantity ?? 0), 0) : 0;
+    const q = Array.isArray(inv.lineItems) ? (inv.lineItems as LineItemLite[]).reduce((s, li) => s + Number(li.quantity ?? 0), 0) : 0;
     cur.qty += q;
     cur.sales += Number(inv.total ?? 0);
     monthlyMap.set(mk, cur);

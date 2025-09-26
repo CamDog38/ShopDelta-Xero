@@ -180,8 +180,8 @@ export function EnhancedTable<T extends Record<string, any>>({
       </div>
       
       {/* Table with horizontal and vertical scroll */}
-      <div className="enhanced-table-wrapper" style={{ maxHeight, overflowX: 'auto' }}>
-        <table className="enhanced-table-table" style={{ minWidth: '800px' }}>
+      <div className="enhanced-table-wrapper" style={{ maxHeight, overflowX: 'auto', width: '100%' }}>
+        <table className="enhanced-table-table" style={{ minWidth: 'max-content', width: '100%' }}>
           <thead>
             <tr>
               {columns.map(column => (

@@ -459,16 +459,17 @@ export function StackedBarChart({
               position: 'absolute',
               left: `${tooltipContent.x + 10}px`,
               top: `${tooltipContent.y - 10}px`,
-              backgroundColor: 'rgba(0, 0, 0, 0.9)',
-              color: '#fff',
+              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              color: '#111827',
               padding: '10px 14px',
               borderRadius: '6px',
               fontSize: '13px',
               pointerEvents: 'none',
               zIndex: 100,
-              boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              minWidth: '150px'
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              border: '1px solid #e5e7eb',
+              minWidth: '150px',
+              backdropFilter: 'blur(8px)'
             }}
             dangerouslySetInnerHTML={{ __html: tooltipContent.content }}
           />

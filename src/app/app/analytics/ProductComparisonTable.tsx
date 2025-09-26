@@ -16,9 +16,10 @@ type ProductComparisonProps = {
   data: ProductComparisonData[];
   currency: string;
   periodLabel: string;
+  metric?: 'qty' | 'sales';
 };
 
-export function ProductComparisonTable({ data, currency, periodLabel }: ProductComparisonProps) {
+export function ProductComparisonTable({ data, currency, periodLabel, metric = 'sales' }: ProductComparisonProps) {
   const [sortField, setSortField] = useState<'title' | 'deltaQty' | 'deltaSales'>('deltaSales');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [searchTerm, setSearchTerm] = useState('');

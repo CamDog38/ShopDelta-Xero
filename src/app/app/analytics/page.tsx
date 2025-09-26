@@ -461,6 +461,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             <div className={`${styles.card} analytics-card`}>
               <div className="analytics-header">
                 <div className="analytics-segmented">
+                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', metric: 'qty' }).toString()}`} className={metric === 'qty' ? '' : 'analytics-muted'}>📦 Quantity</a>
+                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', metric: 'sales' }).toString()}`} className={metric === 'sales' ? '' : 'analytics-muted'}>💰 Sales</a>
+                  <span className="spacer-16" />
                   <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareType: 'mom' }).toString()}`} className={compareType === 'mom' ? '' : 'analytics-muted'}>📊 Month-over-Month</a>
                   <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareType: 'yoy' }).toString()}`} className={compareType === 'yoy' ? '' : 'analytics-muted'}>📅 Year-over-Year</a>
                   <span className="spacer-16" />
@@ -497,6 +500,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       <input type="hidden" name="view" value="compare" />
                       <input type="hidden" name="compareType" value={compareType} />
                       <input type="hidden" name="compareScope" value={compareScope} />
+                      <input type="hidden" name="metric" value={metric} />
                       <input type="hidden" name="preset" value={result?.filters.preset || ''} />
                       <input type="hidden" name="start" value={result?.filters.start || ''} />
                       <input type="hidden" name="end" value={result?.filters.end || ''} />
@@ -645,7 +649,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                             <ProductComparisonTable 
                               data={rows} 
                               currency={result?.totals?.currency || 'USD'} 
-                              periodLabel={periodLabel} 
+                              periodLabel={periodLabel}
+                              metric={metric}
                             />
                           </Suspense>
                         </div>
@@ -795,7 +800,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                               <ProductComparisonTable 
                                 data={rows} 
                                 currency={result?.totals?.currency || 'USD'} 
-                                periodLabel="Comparing each product's performance in your selected period vs the same period last year" 
+                                periodLabel="Comparing each product's performance in your selected period vs the same period last year"
+                                metric={metric}
                               />
                             </Suspense>
                           </div>

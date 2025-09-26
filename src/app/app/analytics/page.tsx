@@ -3,6 +3,12 @@ import '@/app/app/analytics/analytics.css';
 import { getXeroSession } from '@/lib/session';
 import { getXeroAnalytics, type XeroAnalyticsFilters } from './xero-analytics.server';
 import DebugTerminal from './DebugTerminal';
+import { ProductTable } from './ProductTable';
+import { ProductComparisonTable } from './ProductComparisonTable';
+import { EnhancedTable } from './EnhancedTable';
+import { StackedBarChart } from './StackedBarChart';
+import { LineChart } from './LineChart';
+import { Suspense } from 'react';
 
 export const dynamic = 'force-dynamic';
 
@@ -165,7 +171,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               </div>
 
               {/* Aggregate chart */}
-              {chartScope === 'aggregate' && (
+              {chartScope === 'aggregate' && chart === 'bar' && (
                 series.length === 0 ? <p>No data in range.</p> : (
                   <div className="analytics-chart-scroll">
                     <svg width={svgW} height={svgH} role="img" aria-label="Chart">
@@ -199,55 +205,79 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                   </div>
                 )
               )}
+              
+              {/* Aggregate line chart */}
+              {chartScope === 'aggregate' && chart === 'line' && (
+                series.length === 0 ? <p>No data in range.</p> : (
+                  <Suspense fallback={<div>Loading line chart...</div>}>
+                    <LineChart
+                      data={[{
+                        key: 'aggregate',
+                        label: 'Aggregate',
+                        products: series.map(s => ({
+                          id: s.key,
+                          title: s.label,
+                          value: metric === 'sales' ? s.sales : s.quantity
+                        }))
+                      }]}
+                      title={`${metric === 'sales' ? 'Sales' : 'Quantity'} Over Time`}
+                      yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
+                      xAxisLabel="Time Period"
+                      height={400}
+                      formatValue={(v) => metric === 'sales' ? fmtMoney(v) : v.toString()}
+                      currency={result?.totals?.currency}
+                    />
+                  </Suspense>
+                )
+              )}
 
-              {/* By product chart: draw up to 5 product series as grouped bars */}
-              {chartScope === 'product' && (
+              {/* By product chart: stacked bar chart with interactive legend */}
+              {chartScope === 'product' && chart === 'bar' && (
                 ((result?.seriesProduct?.length ?? 0) === 0) ? <p>No data in range.</p> : (
-                  <div className="analytics-chart-scroll">
-                    <svg width={svgW} height={svgH} role="img" aria-label="Chart">
-                      <g transform={`translate(${svgPadding.left},${svgPadding.top})`}>
-                        <line x1={0} y1={0} x2={0} y2={innerH} stroke="#d0d4d9" />
-                        {Array.from({ length: 5 }).map((_, i) => {
-                          const v = (maxMetric / 4) * i;
-                          const y = yScale(v);
-                          return (
-                            <g key={i}>
-                              <line x1={-4} y1={y} x2={0} y2={y} stroke="#aeb4bb" />
-                              <text x={-8} y={y + 4} textAnchor="end" fontSize={10} fill="#6b7177">{Math.round(v)}</text>
-                              <line x1={0} y1={y} x2={innerW} y2={y} stroke="#f1f3f5" />
-                            </g>
-                          );
-                        })}
-                        <line x1={0} y1={innerH} x2={innerW} y2={innerH} stroke="#d0d4d9" />
-                        {(result?.seriesProduct ?? []).map((s, i) => (
-                          <text key={s.key} x={xBand(i)} y={innerH + 16} textAnchor="middle" fontSize={10} fill="#6b7177">{s.label}</text>
-                        ))}
-                        {(result?.seriesProduct ?? []).map((s, i) => {
-                          const keys = Object.keys(s.per).slice(0, 5); // top 5 products for chart readability
-                          const bandW = Math.max(24, innerW / Math.max(1, (result?.seriesProduct ?? []).length) - 16);
-                          const barW = Math.max(6, bandW / Math.max(1, keys.length));
-                          return keys.map((pid, j) => {
-                            const value = metric === 'sales' ? s.per[pid].sales : s.per[pid].qty;
-                            const x = xBand(i) - bandW / 2 + j * barW;
-                            const y = yScale(value);
-                            const h = innerH - y;
-                            const color = ['#4facfe', '#00c6ff', '#9c6ade', '#47c1bf', '#f49342'][j % 5];
-                            return <rect key={`${s.key}-${pid}`} x={x} y={y} width={barW - 2} height={h} fill={color} />
-                          })
-                        })}
-                      </g>
-                    </svg>
-                    <div className="analytics-legend">
-                      <div className="analytics-legend-chips">
-                        {((result?.productLegend) || []).slice(0,5).map((p, idx) => (
-                          <div key={p.id} className="analytics-legend-chip">
-                            <span className="analytics-legend-swatch" style={{ background: ['#4facfe', '#00c6ff', '#9c6ade', '#47c1bf', '#f49342'][idx % 5] }} />
-                            <span className="text-12">{p.title}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <Suspense fallback={<div>Loading stacked bar chart...</div>}>
+                    <StackedBarChart
+                      data={(result?.seriesProduct || []).map(series => ({
+                        key: series.key,
+                        label: series.label,
+                        products: Object.entries(series.per).map(([id, data]) => ({
+                          id,
+                          title: data.title,
+                          value: metric === 'sales' ? data.sales : data.qty
+                        }))
+                      }))}
+                      title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product`}
+                      yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
+                      xAxisLabel="Time Period"
+                      height={400}
+                      formatValue={(v) => metric === 'sales' ? fmtMoney(v) : v.toString()}
+                      currency={result?.totals?.currency}
+                    />
+                  </Suspense>
+                )
+              )}
+              
+              {/* By product chart: line chart with interactive legend */}
+              {chartScope === 'product' && chart === 'line' && (
+                ((result?.seriesProduct?.length ?? 0) === 0) ? <p>No data in range.</p> : (
+                  <Suspense fallback={<div>Loading line chart...</div>}>
+                    <LineChart
+                      data={(result?.seriesProduct || []).map(series => ({
+                        key: series.key,
+                        label: series.label,
+                        products: Object.entries(series.per).map(([id, data]) => ({
+                          id,
+                          title: data.title,
+                          value: metric === 'sales' ? data.sales : data.qty
+                        }))
+                      }))}
+                      title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product Over Time`}
+                      yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
+                      xAxisLabel="Time Period"
+                      height={400}
+                      formatValue={(v) => metric === 'sales' ? fmtMoney(v) : v.toString()}
+                      currency={result?.totals?.currency}
+                    />
+                  </Suspense>
                 )
               )}
             </div>
@@ -258,43 +288,75 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             <div className={`${styles.card} analytics-card`}>
               <h3 className={styles.sectionTitle}>Table View</h3>
               {chartScope === 'product' ? (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Time Period</th>
-                      {(result?.productLegend || []).map((p) => (
-                        <th key={p.id} style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{p.title}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(result?.seriesProduct || []).map((row) => (
-                      <tr key={row.key}>
-                        <td style={{ padding: '8px 6px' }}>{row.label}</td>
-                        {((result?.productLegend) || []).map((p) => (
-                          <td key={p.id} style={{ padding: '8px 6px', textAlign: 'right' }}>{metric === 'sales' ? (row.per[p.id]?.sales ?? 0).toFixed(2) : (row.per[p.id]?.qty ?? 0)}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <Suspense fallback={<div>Loading product data table...</div>}>
+                  <EnhancedTable
+                    data={(result?.seriesProduct || []).map(row => {
+                      const rowData: Record<string, any> = { timePeriod: row.label };
+                      (result?.productLegend || []).forEach(p => {
+                        rowData[p.id] = metric === 'sales' 
+                          ? (row.per[p.id]?.sales ?? 0) 
+                          : (row.per[p.id]?.qty ?? 0);
+                      });
+                      return rowData;
+                    })}
+                    columns={[
+                      {
+                        id: 'timePeriod',
+                        header: 'Time Period',
+                        accessor: (row: Record<string, any>) => row.timePeriod,
+                        sortable: true,
+                        align: 'left',
+                        width: '150px'
+                      },
+                      ...(result?.productLegend || []).map(p => ({
+                        id: p.id,
+                        header: p.title,
+                        accessor: (row: Record<string, any>) => metric === 'sales' 
+                          ? fmtMoney(row[p.id] || 0) 
+                          : row[p.id] || 0,
+                        sortable: true,
+                        align: 'right' as const
+                      }))
+                    ]}
+                    keyField="timePeriod"
+                    title="Products by Time Period"
+                    subtitle={`Showing ${metric === 'sales' ? 'sales' : 'quantity'} for each product across time periods`}
+                    searchPlaceholder="Search by time period or product..."
+                    maxHeight="600px"
+                  />
+                </Suspense>
               ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Time Period</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{metric === 'sales' ? 'Sales' : 'Quantity'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(result?.series || []).map((s) => (
-                      <tr key={s.key}>
-                        <td style={{ padding: '8px 6px' }}>{s.label}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{metric === 'sales' ? s.sales.toFixed(2) : s.quantity}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <Suspense fallback={<div>Loading time series table...</div>}>
+                  <EnhancedTable
+                    data={(result?.series || []).map(s => ({
+                      key: s.key,
+                      label: s.label,
+                      value: metric === 'sales' ? s.sales : s.quantity
+                    }))}
+                    columns={[
+                      {
+                        id: 'label',
+                        header: 'Time Period',
+                        accessor: (row: Record<string, any>) => row.label,
+                        sortable: true,
+                        align: 'left',
+                        width: '150px'
+                      },
+                      {
+                        id: 'value',
+                        header: metric === 'sales' ? 'Sales' : 'Quantity',
+                        accessor: (row: Record<string, any>) => metric === 'sales' ? fmtMoney(row.value) : row.value,
+                        sortable: true,
+                        align: 'right'
+                      }
+                    ]}
+                    keyField="key"
+                    title={`Time Series ${metric === 'sales' ? 'Sales' : 'Quantity'}`}
+                    subtitle={`Showing ${metric === 'sales' ? 'sales' : 'quantity'} across time periods`}
+                    searchPlaceholder="Search by time period..."
+                    maxHeight="600px"
+                  />
+                </Suspense>
               )}
             </div>
           )}
@@ -315,64 +377,89 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               ) : null}
 
               <h4 className={styles.sectionTitle}>Top 10 products by quantity</h4>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>#</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                    <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(result?.top10ByQty || []).map((p, idx) => (
-                    <tr key={p.id}>
-                      <td style={{ padding: '8px 6px' }}>{idx + 1}</td>
-                      <td style={{ padding: '8px 6px' }}>{p.title}</td>
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>{p.qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <Suspense fallback={<div>Loading top products by quantity...</div>}>
+                <EnhancedTable
+                  data={(result?.top10ByQty || []).map((p, idx) => ({
+                    id: p.id,
+                    rank: idx + 1,
+                    title: p.title,
+                    qty: p.qty
+                  }))}
+                  columns={[
+                    {
+                      id: 'rank',
+                      header: '#',
+                      accessor: row => row.rank,
+                      sortable: true,
+                      align: 'left',
+                      width: '50px'
+                    },
+                    {
+                      id: 'title',
+                      header: 'Product',
+                      accessor: row => row.title,
+                      sortable: true,
+                      align: 'left'
+                    },
+                    {
+                      id: 'qty',
+                      header: 'Qty',
+                      accessor: row => row.qty,
+                      sortable: true,
+                      align: 'right',
+                      width: '100px'
+                    }
+                  ]}
+                  keyField="id"
+                  searchPlaceholder="Search products..."
+                  maxHeight="400px"
+                />
+              </Suspense>
 
               <h4 className={styles.sectionTitle}>Top 10 products by sales</h4>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>#</th>
-                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                    <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(result?.top10BySales || []).map((p, idx) => (
-                    <tr key={p.id}>
-                      <td style={{ padding: '8px 6px' }}>{idx + 1}</td>
-                      <td style={{ padding: '8px 6px' }}>{p.title}</td>
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(p.sales)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <Suspense fallback={<div>Loading top products by sales...</div>}>
+                <EnhancedTable
+                  data={(result?.top10BySales || []).map((p, idx) => ({
+                    id: p.id,
+                    rank: idx + 1,
+                    title: p.title,
+                    sales: p.sales
+                  }))}
+                  columns={[
+                    {
+                      id: 'rank',
+                      header: '#',
+                      accessor: row => row.rank,
+                      sortable: true,
+                      align: 'left',
+                      width: '50px'
+                    },
+                    {
+                      id: 'title',
+                      header: 'Product',
+                      accessor: row => row.title,
+                      sortable: true,
+                      align: 'left'
+                    },
+                    {
+                      id: 'sales',
+                      header: 'Sales',
+                      accessor: row => fmtMoney(row.sales),
+                      sortable: true,
+                      align: 'right',
+                      width: '120px'
+                    }
+                  ]}
+                  keyField="id"
+                  searchPlaceholder="Search products..."
+                  maxHeight="400px"
+                />
+              </Suspense>
 
               <h4 className={styles.sectionTitle}>Sales by product</h4>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                    <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty</th>
-                    <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(result?.salesByProduct || []).map((row) => (
-                    <tr key={row.id}>
-                      <td style={{ padding: '8px 6px' }}>{row.title}</td>
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>{row.qty}</td>
-                      <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(row.sales)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <Suspense fallback={<div>Loading product table...</div>}>
+                <ProductTable data={result?.salesByProduct || []} currency={result?.totals?.currency || 'USD'} />
+              </Suspense>
             </div>
           )}
 
@@ -516,56 +603,27 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         if (r) { r.bQty = v.qty; r.bSales = v.sales; }
                         else { rowsMap.set(pid, { title: v.title, aQty: 0, bQty: v.qty, aSales: 0, bSales: v.sales }); }
                       }
-                      const rows = Array.from(rowsMap.entries()).map(([pid, r]) => ({ id: pid, ...r, dQty: r.bQty - r.aQty, dSales: r.bSales - r.aSales }));
-                      const topSales = rows.sort((x,y) => Math.abs(y.dSales) - Math.abs(x.dSales)).slice(0,10);
-                      const topQty = [...rows].sort((x,y) => Math.abs(y.dQty) - Math.abs(x.dQty)).slice(0,10);
+                      const rows = Array.from(rowsMap.entries()).map(([pid, r]) => ({ 
+                        id: pid, 
+                        title: r.title, 
+                        currQty: r.bQty, 
+                        prevQty: r.aQty, 
+                        currSales: r.bSales, 
+                        prevSales: r.aSales 
+                      }));
                       const aLabel = result?.monthlyDict?.[aKey]?.label || aKey;
                       const bLabel = result?.monthlyDict?.[bKey]?.label || bKey;
+                      const periodLabel = `${aLabel} → ${bLabel}`;
+                      
                       return (
                         <div style={{ marginTop: 16 }}>
-                          <h4 className={styles.sectionTitle}>Top 10 products by Sales Δ ({aLabel} → {bLabel})</h4>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
-                            <thead>
-                              <tr>
-                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{aLabel} Sales</th>
-                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{bLabel} Sales</th>
-                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Sales</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {topSales.map(r => (
-                                <tr key={r.id}>
-                                  <td style={{ padding: '8px 6px' }}>{r.title}</td>
-                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.aSales)}</td>
-                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.bSales)}</td>
-                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.dSales)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-
-                          <h4 className={styles.sectionTitle}>Top 10 products by Qty Δ ({aLabel} → {bLabel})</h4>
-                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                              <tr>
-                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{aLabel} Qty</th>
-                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{bLabel} Qty</th>
-                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Qty</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {topQty.map(r => (
-                                <tr key={r.id}>
-                                  <td style={{ padding: '8px 6px' }}>{r.title}</td>
-                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.aQty}</td>
-                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.bQty}</td>
-                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.dQty.toFixed(0)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <Suspense fallback={<div>Loading product comparison...</div>}>
+                            <ProductComparisonTable 
+                              data={rows} 
+                              currency={result?.totals?.currency || 'USD'} 
+                              periodLabel={periodLabel} 
+                            />
+                          </Suspense>
                         </div>
                       );
                     })()
@@ -670,58 +728,28 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         };
                         const currMap = sumPer(currMonths);
                         const prevMap = sumPer(prevMonths);
-                        const rowsP = Array.from(new Set([...currMap.keys(), ...prevMap.keys()])).map(pid => {
+                        const rows = Array.from(new Set([...currMap.keys(), ...prevMap.keys()])).map(pid => {
                           const c = currMap.get(pid) || { title: pid, qty: 0, sales: 0 };
                           const p = prevMap.get(pid) || { title: c.title, qty: 0, sales: 0 };
-                          return { id: pid, title: c.title || p.title, cQty: c.qty, pQty: p.qty, cSales: c.sales, pSales: p.sales, dQty: c.qty - p.qty, dSales: c.sales - p.sales };
+                          return { 
+                            id: pid, 
+                            title: c.title || p.title, 
+                            currQty: c.qty, 
+                            prevQty: p.qty, 
+                            currSales: c.sales, 
+                            prevSales: p.sales 
+                          };
                         });
-                        const topSales = rowsP.sort((a,b) => Math.abs(b.dSales) - Math.abs(a.dSales)).slice(0,10);
-                        const topQty = [...rowsP].sort((a,b) => Math.abs(b.dQty) - Math.abs(a.dQty)).slice(0,10);
+                        
                         return (
                           <div style={{ marginTop: 16 }}>
-                            <h4 className={styles.sectionTitle}>Top 10 products by Sales Δ (YoY)</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
-                              <thead>
-                                <tr>
-                                  <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Curr)</th>
-                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Prev)</th>
-                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Sales</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {topSales.map(r => (
-                                  <tr key={r.id}>
-                                    <td style={{ padding: '8px 6px' }}>{r.title}</td>
-                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.cSales)}</td>
-                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.pSales)}</td>
-                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.dSales)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-
-                            <h4 className={styles.sectionTitle}>Top 10 products by Qty Δ (YoY)</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                              <thead>
-                                <tr>
-                                  <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
-                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Curr)</th>
-                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Prev)</th>
-                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Qty</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {topQty.map(r => (
-                                  <tr key={r.id}>
-                                    <td style={{ padding: '8px 6px' }}>{r.title}</td>
-                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.cQty}</td>
-                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.pQty}</td>
-                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.dQty.toFixed(0)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                            <Suspense fallback={<div>Loading product comparison...</div>}>
+                              <ProductComparisonTable 
+                                data={rows} 
+                                currency={result?.totals?.currency || 'USD'} 
+                                periodLabel="Comparing each product's performance in your selected period vs the same period last year" 
+                              />
+                            </Suspense>
                           </div>
                         );
                       })()}

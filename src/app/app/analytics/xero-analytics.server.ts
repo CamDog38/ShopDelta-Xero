@@ -17,6 +17,8 @@ type LineItemLite = {
   description?: string;
   quantity?: number;
   lineAmount?: number;
+  unitAmount?: number;
+  taxAmount?: number;
 };
 type InvoiceLite = {
   date?: string;
@@ -26,6 +28,8 @@ type InvoiceLite = {
   invoiceID?: string;
   invoiceNumber?: string;
   status?: string;
+  type?: string;
+  lineAmountTypes?: string; // 'Exclusive' | 'Inclusive' | 'NoTax'
 };
 type ItemLite = {
   code?: string;
@@ -62,6 +66,7 @@ export type XeroAnalyticsResult = {
   // Comparisons
   mom: Array<{ period: string; curr: { qty: number; sales: number }; prev: { qty: number; sales: number } }>;
   yoy: Array<{ month: string; curr: { qty: number; sales: number }; prev: { qty: number; sales: number } }>;
+  diagnostics: { fetched: number; included: number; excludedNonSales: number; excludedStatus: number };
 };
 
 function startOfWeekUTC(d: Date) {
@@ -149,10 +154,20 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   // Fetch invoices within a broad range. Xero API doesn't support complex filters in all SDK versions,
   // so we fetch a reasonable number and filter in memory for the example.
   const invRes = await requestWithRetry(() => xero.accountingApi.getInvoices(session.tenantId));
-  const invoices = ((invRes.body?.invoices ?? []) as unknown as InvoiceLite[]).filter((inv) => {
+  const fetchedAll = ((invRes.body?.invoices ?? []) as unknown as InvoiceLite[]);
+  let excludedNonSales = 0;
+  let excludedStatus = 0;
+  const invoices = fetchedAll.filter((inv) => {
     const d = inv.date;
     const dt = d ? new Date(d) : null;
     if (!dt) return false;
+    // Only include sales invoices and credit notes (Accounts Receivable)
+    const t = (inv.type || '').toUpperCase();
+    const isSales = t === 'ACCREC' || t === 'ACCRECCREDIT' || !inv.type;
+    if (!isSales) { excludedNonSales++; return false; }
+    const status = (inv.status || '').toUpperCase();
+    const isGoodStatus = status === 'AUTHORISED' || status === 'PAID' || status === '';
+    if (!isGoodStatus) { excludedStatus++; return false; }
     return dt >= start && dt <= end;
   });
 
@@ -161,13 +176,32 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   // Aggregate by bucket
   const map = new Map<string, { quantity: number; sales: number }>();
   for (const inv of invoices) {
+    const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
     const dt = new Date(inv.date ?? Date.now());
     const key = bucketKey(dt, granularity);
     const current = map.get(key) || { quantity: 0, sales: 0 };
     const qty = Array.isArray(inv.lineItems)
-      ? inv.lineItems.reduce((s: number, li: LineItemLite) => s + Number(li?.quantity ?? 0), 0)
+      ? inv.lineItems.reduce((s: number, li: LineItemLite) => s + sign * Number(li?.quantity ?? 0), 0)
       : 0;
-    const total = Number(inv.total ?? 0);
+    // Pre-tax line amount: (lineAmount or unit*qty) minus taxAmount if present
+    const totalLinesPretax = Array.isArray(inv.lineItems)
+      ? inv.lineItems.reduce((s: number, li: LineItemLite) => {
+          const gross = li.lineAmount ?? ((li.unitAmount ?? 0) * (li.quantity ?? 0));
+          const pretax = Number((gross ?? 0)) - Number(li.taxAmount ?? 0);
+          return s + sign * pretax;
+        }, 0)
+      : 0;
+    // Prefer invoice total, but adjust to pre-tax if we can infer tax: when Inclusive, subtract sum of tax amounts
+    let total = totalLinesPretax;
+    if (typeof inv.total === 'number') {
+      if (inv.lineAmountTypes && inv.lineAmountTypes.toLowerCase() === 'inclusive' && Array.isArray(inv.lineItems)) {
+        const taxSum = inv.lineItems.reduce((s: number, li) => s + Number(li.taxAmount ?? 0), 0);
+        total = sign * (Number(inv.total) - taxSum);
+      } else {
+        // assume invoice total already exclusive or no tax; still apply sign
+        total = sign * Number(inv.total);
+      }
+    }
     current.quantity += qty;
     current.sales += total;
     map.set(key, current);
@@ -206,6 +240,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   const productMap = new Map<string, { title: string; qty: number; sales: number }>();
   const seriesProductMap = new Map<string, Map<string, { qty: number; sales: number; title: string }>>();
   for (const inv of invoices) {
+    const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
     const dt = new Date(inv.date ?? Date.now());
     const key = bucketKey(dt, granularity);
     let perBucket = seriesProductMap.get(key);
@@ -214,8 +249,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
       for (const li of inv.lineItems as LineItemLite[]) {
         const pid = String(li.itemCode || li.description || 'unknown');
         const title = String(li.description || li.itemCode || 'Item');
-        const liQty = Number(li.quantity ?? 0);
-        const liSales = Number(li.lineAmount ?? 0);
+        const liQty = sign * Number(li.quantity ?? 0);
+        const fallbackAmt = (li.unitAmount ?? 0) * (li.quantity ?? 0);
+        const chosenAmt = li.lineAmount ?? fallbackAmt;
+        const liSales = sign * (Number(chosenAmt || 0) - Number(li.taxAmount ?? 0));
         // totals per product
         const agg = productMap.get(pid) || { title, qty: 0, sales: 0 };
         agg.qty += liQty;
@@ -251,12 +288,29 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   function monthKey(d: Date) { return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`; }
   const monthlyMap = new Map<string, { qty: number; sales: number }>();
   for (const inv of invoices) {
+    const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
     const d = new Date(inv.date ?? Date.now());
     const mk = monthKey(d);
     const cur = monthlyMap.get(mk) || { qty: 0, sales: 0 };
-    const q = Array.isArray(inv.lineItems) ? (inv.lineItems as LineItemLite[]).reduce((s, li) => s + Number(li.quantity ?? 0), 0) : 0;
+    const q = Array.isArray(inv.lineItems) ? (inv.lineItems as LineItemLite[]).reduce((s, li) => s + sign * Number(li.quantity ?? 0), 0) : 0;
     cur.qty += q;
-    cur.sales += Number(inv.total ?? 0);
+    const sumLines = Array.isArray(inv.lineItems)
+      ? (inv.lineItems as LineItemLite[]).reduce((s, li) => {
+          const fb = (li.unitAmount ?? 0) * (li.quantity ?? 0);
+          const chosen = (li.lineAmount ?? fb) - Number(li.taxAmount ?? 0);
+          return s + sign * Number(chosen || 0);
+        }, 0)
+      : 0;
+    let chosenTotal = sumLines;
+    if (typeof inv.total === 'number') {
+      if (inv.lineAmountTypes && inv.lineAmountTypes.toLowerCase() === 'inclusive' && Array.isArray(inv.lineItems)) {
+        const taxSum = inv.lineItems.reduce((s: number, li) => s + Number(li.taxAmount ?? 0), 0);
+        chosenTotal = sign * (Number(inv.total) - taxSum);
+      } else {
+        chosenTotal = sign * Number(inv.total);
+      }
+    }
+    cur.sales += Number(chosenTotal ?? 0);
     monthlyMap.set(mk, cur);
   }
   const sortedMonths = Array.from(monthlyMap.keys()).sort();
@@ -288,5 +342,6 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     salesByProduct,
     mom,
     yoy,
+    diagnostics: { fetched: fetchedAll.length, included: invoices.length, excludedNonSales, excludedStatus },
   };
 }

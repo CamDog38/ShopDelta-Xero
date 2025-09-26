@@ -143,6 +143,13 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                 <div className="legend-label">{result?.filters.start} to {result?.filters.end}</div>
               </div>
 
+              <div className="legend-label" style={{ marginBottom: 8 }}>
+                Note: values are pre-tax. Credit notes are included as negatives.
+                {result?.diagnostics ? (
+                  <span> · Data: {result.diagnostics.included}/{result.diagnostics.fetched} invoices (excluded non-sales {result.diagnostics.excludedNonSales}, status {result.diagnostics.excludedStatus})</span>
+                ) : null}
+              </div>
+
               {/* Aggregate chart */}
               {chartScope === 'aggregate' && (
                 series.length === 0 ? <p>No data in range.</p> : (
@@ -283,7 +290,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             <div className={`${styles.card} analytics-card`}>
               <h3 className={styles.sectionTitle}>Summary</h3>
               <p>Total quantity: {result?.totals.qty}</p>
-              <p>Total sales: {fmtMoney(result?.totals.sales)}</p>
+              <p>Total sales (pre-tax): {fmtMoney(result?.totals.sales)}</p>
+              <p className="legend-label">Note: values are pre-tax. Credit notes are included as negatives.</p>
 
               <h4 className={styles.sectionTitle}>Top 10 products by quantity</h4>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>

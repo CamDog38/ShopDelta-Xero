@@ -197,22 +197,24 @@
   max-width: 100%;
 }
 
-/* Enforce containment at the page container level to prevent any overflow */
-.page-module__JnUBza__container {
-  max-width: 100%;
-  overflow-x: hidden; /* prevent the white card from extending the viewport */
+/* Ensure the page content container never lets cards overflow viewport */
+.layout-module__u5iuSq__content {
+  overflow-x: hidden; /* hide any accidental outer overflow */
 }
 
-.page-module__JnUBza__container .analytics-card {
+.layout-module__u5iuSq__content .analytics-card {
   max-width: 100%;
   overflow: hidden;
 }
 
-.page-module__JnUBza__container .analytics-chart-scroll {
+/* Inside cards, allow chart wrappers to handle horizontal overflow */
+.layout-module__u5iuSq__content .analytics-card > .analytics-chart-scroll,
+.layout-module__u5iuSq__content .analytics-card > .line-chart-scroll-container {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto; /* inner scroll */
+  overflow-x: auto;
   overflow-y: hidden;
+  display: block;
 }
 
 /* Line Chart Styles */

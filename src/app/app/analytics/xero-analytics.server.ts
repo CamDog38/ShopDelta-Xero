@@ -70,6 +70,7 @@ export type XeroAnalyticsResult = {
   monthlyTotals: Array<{ key: string; label: string; qty: number; sales: number }>;
   monthlyDict: Record<string, { label: string; qty: number; sales: number }>;
   credits: { count: number; qty: number; sales: number };
+  monthlyProduct: Array<{ key: string; per: Record<string, { title: string; qty: number; sales: number }> }>;
 };
 
 function startOfWeekUTC(d: Date) {
@@ -332,6 +333,39 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     return { key, label: key, per };
   });
 
+  // Monthly per-product matrix for comparisons (MoM/YoY)
+  const monthlyProductMap = new Map<string, Map<string, { title: string; qty: number; sales: number }>>();
+  for (const inv of invoices) {
+    const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
+    const mk = monthKey(new Date(inv.date ?? Date.now()));
+    let per = monthlyProductMap.get(mk);
+    if (!per) { per = new Map(); monthlyProductMap.set(mk, per); }
+    if (!Array.isArray(inv.lineItems)) continue;
+    for (const li of inv.lineItems as LineItemLite[]) {
+      const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
+      let pid = rawCode || String(li.description || 'unknown');
+      let title = (rawCode && itemsIndex.get(rawCode)?.name) || String(li.description || li.itemCode || 'Item');
+      if (!rawCode && li.description) {
+        const norm = normalizeText(li.description);
+        const hit = norm ? itemsNameIndex.get(norm) : undefined;
+        if (hit) { title = hit.name || title; pid = String(hit.code || title); }
+      }
+      const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
+      let q = li.quantity; if ((q == null || q === 0) && hasAmount) q = 1;
+      const fb = (li.unitAmount ?? 0) * (li.quantity ?? 0);
+      const amt = (li.lineAmount ?? fb) - Number(li.taxAmount ?? 0);
+      const agg = per.get(pid) || { title, qty: 0, sales: 0 };
+      agg.qty += sign * Number(q ?? 0);
+      agg.sales += sign * Number(amt || 0);
+      per.set(pid, agg);
+    }
+  }
+  const monthlyProduct = Array.from(monthlyProductMap.entries()).sort(([a],[b]) => a.localeCompare(b)).map(([key, mp]) => {
+    const per: Record<string, { title: string; qty: number; sales: number }> = {};
+    for (const [id, v] of mp.entries()) per[id] = { title: v.title, qty: v.qty, sales: v.sales };
+    return { key, per };
+  });
+
   // Summary tables
   const salesByProduct = Array.from(productMap.entries())
     .map(([id, v]) => ({ id, title: v.title, qty: v.qty, sales: v.sales }))
@@ -426,5 +460,6 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     monthlyTotals,
     monthlyDict,
     credits: { count: creditCount, qty: creditQty, sales: creditSales },
+    monthlyProduct,
   };
 }

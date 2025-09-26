@@ -488,6 +488,82 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       ))}
                     </tbody>
                   </table>
+
+                  {/* By Product tables */}
+                  {compareScope === 'product' && (
+                    (() => {
+                      const months = (result?.monthlyProduct || []).map(mp => mp.key);
+                      let aKey = compareA || '';
+                      let bKey = compareB || '';
+                      if (!aKey || !bKey) {
+                        if (months.length >= 2) { aKey = months[months.length-2]; bKey = months[months.length-1]; }
+                      }
+                      const a = (result?.monthlyProduct || []).find(mp => mp.key === aKey);
+                      const b = (result?.monthlyProduct || []).find(mp => mp.key === bKey);
+                      if (!a || !b) return null;
+                      const rowsMap = new Map<string, { title: string; aQty: number; bQty: number; aSales: number; bSales: number }>();
+                      for (const [pid, v] of Object.entries(a.per)) {
+                        rowsMap.set(pid, { title: v.title, aQty: v.qty, bQty: 0, aSales: v.sales, bSales: 0 });
+                      }
+                      for (const [pid, v] of Object.entries(b.per)) {
+                        const r = rowsMap.get(pid);
+                        if (r) { r.bQty = v.qty; r.bSales = v.sales; }
+                        else { rowsMap.set(pid, { title: v.title, aQty: 0, bQty: v.qty, aSales: 0, bSales: v.sales }); }
+                      }
+                      const rows = Array.from(rowsMap.entries()).map(([pid, r]) => ({ id: pid, ...r, dQty: r.bQty - r.aQty, dSales: r.bSales - r.aSales }));
+                      const topSales = rows.sort((x,y) => Math.abs(y.dSales) - Math.abs(x.dSales)).slice(0,10);
+                      const topQty = [...rows].sort((x,y) => Math.abs(y.dQty) - Math.abs(x.dQty)).slice(0,10);
+                      const aLabel = result?.monthlyDict?.[aKey]?.label || aKey;
+                      const bLabel = result?.monthlyDict?.[bKey]?.label || bKey;
+                      return (
+                        <div style={{ marginTop: 16 }}>
+                          <h4 className={styles.sectionTitle}>Top 10 products by Sales Δ ({aLabel} → {bLabel})</h4>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
+                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{aLabel} Sales</th>
+                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{bLabel} Sales</th>
+                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Sales</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {topSales.map(r => (
+                                <tr key={r.id}>
+                                  <td style={{ padding: '8px 6px' }}>{r.title}</td>
+                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.aSales)}</td>
+                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.bSales)}</td>
+                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.dSales)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+
+                          <h4 className={styles.sectionTitle}>Top 10 products by Qty Δ ({aLabel} → {bLabel})</h4>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                              <tr>
+                                <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
+                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{aLabel} Qty</th>
+                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>{bLabel} Qty</th>
+                                <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Qty</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {topQty.map(r => (
+                                <tr key={r.id}>
+                                  <td style={{ padding: '8px 6px' }}>{r.title}</td>
+                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.aQty}</td>
+                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.bQty}</td>
+                                  <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.dQty.toFixed(0)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()
+                  )}
                   </>
                 )
               ) : (
@@ -521,7 +597,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         </div>
                       </div>
 
-                      {/* YoY table */}
+                      {/* YoY table (Totals) */}
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr>
@@ -565,6 +641,84 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                           </tr>
                         </tfoot>
                       </table>
+
+                      {/* YoY By Product aggregated over period */}
+                      {compareScope === 'product' && (() => {
+                        const months = (result?.monthlyTotals || []).map(m => m.key);
+                        const currMonths = months;
+                        const prevMonths = months.map(k => {
+                          const [y,m] = k.split('-').map(n=>Number(n));
+                          return `${y-1}-${String(m).padStart(2,'0')}`;
+                        });
+                        const sumPer = (keys: string[]) => {
+                          const acc = new Map<string, { title: string; qty: number; sales: number }>();
+                          for (const k of keys) {
+                            const mp = (result?.monthlyProduct || []).find(x => x.key === k);
+                            if (!mp) continue;
+                            for (const [pid, v] of Object.entries(mp.per)) {
+                              const r = acc.get(pid) || { title: v.title, qty: 0, sales: 0 };
+                              r.qty += v.qty; r.sales += v.sales; acc.set(pid, r);
+                            }
+                          }
+                          return acc;
+                        };
+                        const currMap = sumPer(currMonths);
+                        const prevMap = sumPer(prevMonths);
+                        const rowsP = Array.from(new Set([...currMap.keys(), ...prevMap.keys()])).map(pid => {
+                          const c = currMap.get(pid) || { title: pid, qty: 0, sales: 0 };
+                          const p = prevMap.get(pid) || { title: c.title, qty: 0, sales: 0 };
+                          return { id: pid, title: c.title || p.title, cQty: c.qty, pQty: p.qty, cSales: c.sales, pSales: p.sales, dQty: c.qty - p.qty, dSales: c.sales - p.sales };
+                        });
+                        const topSales = rowsP.sort((a,b) => Math.abs(b.dSales) - Math.abs(a.dSales)).slice(0,10);
+                        const topQty = [...rowsP].sort((a,b) => Math.abs(b.dQty) - Math.abs(a.dQty)).slice(0,10);
+                        return (
+                          <div style={{ marginTop: 16 }}>
+                            <h4 className={styles.sectionTitle}>Top 10 products by Sales Δ (YoY)</h4>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
+                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Curr)</th>
+                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Prev)</th>
+                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Sales</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {topSales.map(r => (
+                                  <tr key={r.id}>
+                                    <td style={{ padding: '8px 6px' }}>{r.title}</td>
+                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.cSales)}</td>
+                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.pSales)}</td>
+                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.dSales)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+
+                            <h4 className={styles.sectionTitle}>Top 10 products by Qty Δ (YoY)</h4>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr>
+                                  <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Product</th>
+                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Curr)</th>
+                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Prev)</th>
+                                  <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Δ Qty</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {topQty.map(r => (
+                                  <tr key={r.id}>
+                                    <td style={{ padding: '8px 6px' }}>{r.title}</td>
+                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.cQty}</td>
+                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.pQty}</td>
+                                    <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.dQty.toFixed(0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
                     </>
                   );
                 })()

@@ -21,6 +21,7 @@ type StackedBarChartProps = {
   xAxisLabel?: string;
   height?: number;
   formatValue?: (value: number) => string;
+  formatType?: 'money' | 'number' | 'string';
   currency?: string;
   onBarClick?: (key: string) => void;
 };
@@ -42,7 +43,8 @@ export function StackedBarChart({
   yAxisLabel,
   xAxisLabel,
   height = 400,
-  formatValue = (v) => v.toString(),
+  formatValue,
+  formatType = 'number',
   currency,
   onBarClick
 }: StackedBarChartProps) {
@@ -134,15 +136,18 @@ export function StackedBarChart({
   
   // Format value with currency if provided
   const formatValueWithCurrency = (value: number) => {
-    if (currency) {
+    if (formatType === 'money' || currency) {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency,
+        currency: currency || 'USD',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       }).format(value);
     }
-    return formatValue(value);
+    if (formatValue) {
+      return formatValue(value);
+    }
+    return formatType === 'number' ? value.toString() : String(value);
   };
   
   // Calculate bar width

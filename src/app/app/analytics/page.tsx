@@ -223,7 +223,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
                       xAxisLabel="Time Period"
                       height={400}
-                      formatValue={(v) => metric === 'sales' ? fmtMoney(v) : v.toString()}
+                      formatType={metric === 'sales' ? 'money' : 'number'}
                       currency={result?.totals?.currency}
                     />
                   </Suspense>
@@ -248,7 +248,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
                       xAxisLabel="Time Period"
                       height={400}
-                      formatValue={(v) => metric === 'sales' ? fmtMoney(v) : v.toString()}
+                      formatType={metric === 'sales' ? 'money' : 'number'}
                       currency={result?.totals?.currency}
                     />
                   </Suspense>
@@ -273,7 +273,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
                       xAxisLabel="Time Period"
                       height={400}
-                      formatValue={(v) => metric === 'sales' ? fmtMoney(v) : v.toString()}
+                      formatType={metric === 'sales' ? 'money' : 'number'}
                       currency={result?.totals?.currency}
                     />
                   </Suspense>

@@ -461,9 +461,6 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             <div className={`${styles.card} analytics-card`}>
               <div className="analytics-header">
                 <div className="analytics-segmented">
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', metric: 'qty' }).toString()}`} className={metric === 'qty' ? '' : 'analytics-muted'}>📦 Quantity</a>
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', metric: 'sales' }).toString()}`} className={metric === 'sales' ? '' : 'analytics-muted'}>💰 Sales</a>
-                  <span className="spacer-16" />
                   <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareType: 'mom' }).toString()}`} className={compareType === 'mom' ? '' : 'analytics-muted'}>📊 Month-over-Month</a>
                   <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareType: 'yoy' }).toString()}`} className={compareType === 'yoy' ? '' : 'analytics-muted'}>📅 Year-over-Year</a>
                   <span className="spacer-16" />
@@ -590,6 +587,21 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       }
                       const a = (result?.monthlyProduct || []).find(mp => mp.key === aKey);
                       const b = (result?.monthlyProduct || []).find(mp => mp.key === bKey);
+                      
+                      // Debug logging for MoM QTY data
+                      console.log('🔍 Compare Tab Debug - MoM Product Data:');
+                      console.log('Month A key:', aKey, 'Month B key:', bKey);
+                      console.log('Monthly product data:', result?.monthlyProduct);
+                      console.log('A data:', a);
+                      console.log('B data:', b);
+                      if (a?.per) {
+                        const firstProductA = Object.entries(a.per)[0];
+                        console.log('Sample A product:', firstProductA);
+                      }
+                      if (b?.per) {
+                        const firstProductB = Object.entries(b.per)[0];
+                        console.log('Sample B product:', firstProductB);
+                      }
                       
                       // If no data is available, show a message
                       if (!a || !b) {
@@ -757,6 +769,18 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         };
                         const currMap = sumPer(currMonths);
                         const prevMap = sumPer(prevMonths);
+                        
+                        // Debug logging for QTY data
+                        console.log('🔍 Compare Tab Debug - YoY Product Data:');
+                        console.log('Current months:', currMonths);
+                        console.log('Previous months:', prevMonths);
+                        console.log('Monthly product data:', result?.monthlyProduct);
+                        console.log('Current map size:', currMap.size);
+                        console.log('Previous map size:', prevMap.size);
+                        if (currMap.size > 0) {
+                          const firstProduct = Array.from(currMap.entries())[0];
+                          console.log('Sample current product:', firstProduct);
+                        }
                         
                         // If no data is available, show a message
                         if (currMap.size === 0 && prevMap.size === 0) {

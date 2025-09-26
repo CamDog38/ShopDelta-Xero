@@ -313,7 +313,8 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
       })) : []
     });
     
-    if (Array.isArray(lineItems)) {
+    // If line items exist, process them normally
+    if (Array.isArray(lineItems) && lineItems.length > 0) {
       for (const li of lineItems as LineItemLite[]) {
         // Handle case-insensitive property names
         const itemCode = li.itemCode || (li as any).ItemCode;
@@ -376,6 +377,59 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
         pb.sales += liSales;
         perBucket.set(pid, pb);
       }
+    }
+    // Use invoice reference as fallback product when line items are empty
+    else {
+      console.log('📦 [USING INVOICE AS PRODUCT]', { 
+        reference: (inv as any).reference,
+        total: inv.total
+      });
+      
+      // Try to match reference to an item code
+      const reference = String((inv as any).reference || '');
+      const normalizedRef = normalizeText(reference);
+      let pid = reference;
+      let title = reference || 'Invoice ' + (inv.invoiceNumber || inv.invoiceID);
+      let itemInfo;
+      
+      // Try exact match by code
+      if (reference) {
+        const upperRef = reference.toUpperCase();
+        itemInfo = itemsIndex.get(upperRef);
+        if (itemInfo) {
+          productItemMatches++;
+          pid = upperRef;
+          title = itemInfo.name || title;
+        } 
+        // Try heuristic match by name
+        else if (normalizedRef) {
+          const nameHit = itemsNameIndex.get(normalizedRef);
+          if (nameHit) {
+            productHeuristicMatches++;
+            itemInfo = nameHit;
+            title = nameHit.name || title;
+            pid = String(nameHit.code || title);
+          }
+        }
+      }
+      
+      // Use invoice total as sales amount and infer quantity = 1
+      const liQty = sign * 1;  // Infer quantity = 1
+      const liSales = sign * (Number(inv.total || 0) - Number((inv as any).totalTax || 0));
+      
+      // Add to product map
+      const agg = productMap.get(pid) || { title, qty: 0, sales: 0 };
+      agg.qty += liQty;
+      agg.sales += liSales;
+      productMap.set(pid, agg);
+      
+      // Add to per-bucket per-product
+      const pb = perBucket.get(pid) || { qty: 0, sales: 0, title };
+      pb.qty += liQty;
+      pb.sales += liSales;
+      perBucket.set(pid, pb);
+      
+      inferredQtyLines++; // Count as inferred quantity
     }
   }
 

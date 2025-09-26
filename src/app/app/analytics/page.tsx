@@ -153,6 +153,12 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                 {result?.diagnostics ? (
                   <span> · Data: {result.diagnostics.included}/{result.diagnostics.fetched} invoices (excluded non-sales {result.diagnostics.excludedNonSales}, status {result.diagnostics.excludedStatus})</span>
                 ) : null}
+                {result?.diagnostics?.productCodeMatches !== undefined ? (
+                  <span> · Products: {result.diagnostics.productCodeMatches} exact, {result.diagnostics.productHeuristicMatches} heuristic</span>
+                ) : null}
+                {result?.diagnostics?.inferredQtyLines ? (
+                  <span> · Qty inferred: {result.diagnostics.inferredQtyLines} lines</span>
+                ) : null}
                 {result?.credits ? (
                   <span> · Credits: {result.credits.count} docs, Qty {result.credits.qty}, Sales {fmtMoney(result.credits.sales)}</span>
                 ) : null}

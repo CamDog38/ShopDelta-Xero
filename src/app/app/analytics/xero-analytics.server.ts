@@ -235,6 +235,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   const series = keys.map((k) => ({ key: k, label: k, quantity: map.get(k)!.quantity, sales: map.get(k)!.sales }));
 
   const totals = series.reduce((acc, s) => ({ qty: acc.qty + s.quantity, sales: acc.sales + s.sales }), { qty: 0, sales: 0 });
+  console.log('[analytics] aggregate by period complete', { periods: keys.length, totals });
 
   // Recent invoices (all in range, newest first)
   const recentInvoices = invoices
@@ -333,6 +334,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }
 
   const productLegend = Array.from(productMap.entries()).map(([id, v]) => ({ id, title: v.title }));
+  console.log('[analytics] per-product breakdown complete', { products: productMap.size, productItemMatches, productHeuristicMatches });
   const seriesProduct = Array.from(seriesProductMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([key, mp]) => {
     const per: Record<string, { qty: number; sales: number; title: string }> = {};
     for (const [id, v] of mp.entries()) per[id] = { qty: v.qty, sales: v.sales, title: v.title };

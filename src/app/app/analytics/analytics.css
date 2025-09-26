@@ -1,0 +1,116 @@
+/* Analytics shared styles */
+
+.analytics-form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  
+  .analytics-select {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .analytics-apply {
+    align-self: flex-end;
+  }
+  
+  /* Card */
+  .analytics-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  
+  .analytics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  /* Segmented control area, uses Polaris buttons; we just space them */
+  .analytics-segmented {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+  }
+  
+  /* Chart container */
+  .analytics-chart-scroll {
+    overflow-x: auto;
+  }
+  
+  /* Legend */
+  .analytics-legend {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .analytics-legend-chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .analytics-legend-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f6f6f7;
+    border-radius: 999px;
+    padding: 2px 8px;
+    cursor: pointer;
+  }
+  
+  .analytics-legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  
+  .analytics-muted {
+    opacity: 0.45;
+  }
+  
+  /* Utilities */
+  .spacer-12 { display: inline-block; width: 12px; }
+  .spacer-16 { display: inline-block; width: 16px; }
+  .inline-label { display: inline-flex; align-items: center; gap: 8px; }
+  .legend-label { font-size: 12px; color: #6b7177; }
+  .text-12 { font-size: 12px; }
+  
+  /* Comparison selectors */
+  .analytics-compare-selectors { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .analytics-compare-apply { margin-left: 4px; }
+  
+  /* DataTable polish */
+  .analytics-table-sticky {
+    max-height: 520px;
+    overflow: auto;
+  }
+  .analytics-table-sticky .Polaris-DataTable__Table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #fff;
+  }
+  .Polaris-DataTable td,
+  .Polaris-DataTable th {
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* Chart hover effects */
+  .analytics-card svg rect:hover,
+  .analytics-card svg circle:hover {
+    filter: brightness(1.06);
+    opacity: 0.9;
+  }
+  

@@ -1,0 +1,35 @@
+.container {
+  padding: 24px;
+  max-width: 720px;
+}
+
+.primaryBtn {
+  display: inline-block;
+  padding: 10px 16px;
+  background: #006778;
+  color: #fff;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.secondaryBtn {
+  display: inline-block;
+  padding: 8px 12px;
+  background: #e6eff1;
+  color: #00424c;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.actionsRow {
+  margin-top: 12px;
+}
+
+.helpText {
+  margin-top: 8px;
+  color: #555;
+}
+
+.footerLink {
+  margin-top: 24px;
+}

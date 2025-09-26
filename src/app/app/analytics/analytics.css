@@ -172,6 +172,17 @@
   z-index: 10 !important;
 }
 
+/* Chart Container Styles */
+.analytics-chart-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
 /* Line Chart Styles */
 .line-chart-container {
   margin-bottom: 24px;
@@ -181,17 +192,34 @@
 .line-chart-scroll-container {
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid #4a5568;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
+  margin-bottom: 16px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.line-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
 .line-chart-legend-item {
   transition: opacity 0.2s ease, background-color 0.2s ease;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
 }
 
 .line-chart-legend-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: #f3f4f6;
 }
 
 /* Enhanced Table Styles */
@@ -201,7 +229,7 @@
 }
 
 .enhanced-table-subtitle {
-  color: #a0aec0;
+  color: #6b7280;
   margin-bottom: 12px;
   font-size: 14px;
 }
@@ -223,10 +251,10 @@
 .enhanced-table-search-input {
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid #4a5568;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
-  background-color: #1e1e1e;
-  color: #e5e7eb;
+  background-color: #ffffff;
+  color: #111827;
 }
 
 .enhanced-table-column-toggle {
@@ -235,10 +263,10 @@
 
 .enhanced-table-column-toggle-button {
   padding: 8px 12px;
-  background-color: #2d3748;
-  border: none;
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
-  color: #e5e7eb;
+  color: #374151;
   cursor: pointer;
 }
 
@@ -246,13 +274,14 @@
   position: absolute;
   right: 0;
   top: 100%;
-  background-color: #1a202c;
-  border: 1px solid #4a5568;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   padding: 8px;
   z-index: 10;
   min-width: 150px;
   display: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .enhanced-table-column-toggle:hover .enhanced-table-column-toggle-menu {
@@ -263,11 +292,12 @@
   display: block;
   padding: 4px 8px;
   white-space: nowrap;
+  color: #374151;
 }
 
 .enhanced-table-wrapper {
   overflow-x: auto;
-  border: 1px solid #4a5568;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
 }
 
@@ -279,11 +309,13 @@
 .enhanced-table-header {
   position: sticky;
   top: 0;
-  background-color: #2d3748;
+  background-color: #f9fafb;
   padding: 12px 16px;
   text-align: left;
   z-index: 1;
-  border-bottom: 1px solid #4a5568;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-weight: 600;
 }
 
 .enhanced-table-sortable {
@@ -291,7 +323,7 @@
 }
 
 .enhanced-table-sortable:hover {
-  background-color: #3a4a5e;
+  background-color: #f3f4f6;
 }
 
 .enhanced-table-header-content {
@@ -302,6 +334,7 @@
 
 .enhanced-table-sort-indicator {
   margin-left: 4px;
+  color: #6b7280;
 }
 
 .enhanced-table-column-filter {
@@ -311,39 +344,40 @@
 .enhanced-table-column-filter-input {
   width: 100%;
   padding: 4px 8px;
-  border: 1px solid #4a5568;
+  border: 1px solid #d1d5db;
   border-radius: 3px;
-  background-color: #1e1e1e;
-  color: #e5e7eb;
+  background-color: #ffffff;
+  color: #111827;
   font-size: 12px;
 }
 
 .enhanced-table-row-even {
-  background-color: #1a202c;
+  background-color: #ffffff;
 }
 
 .enhanced-table-row-odd {
-  background-color: #2d3748;
+  background-color: #f9fafb;
 }
 
 .enhanced-table-row:hover {
-  background-color: #3a4a5e;
+  background-color: #f3f4f6;
 }
 
 .enhanced-table-cell {
   padding: 12px 16px;
-  border-bottom: 1px solid #4a5568;
+  border-bottom: 1px solid #e5e7eb;
+  color: #111827;
 }
 
 .enhanced-table-empty {
   padding: 24px;
   text-align: center;
-  color: #a0aec0;
+  color: #6b7280;
 }
 
 .enhanced-table-footer {
   margin-top: 12px;
   font-size: 14px;
-  color: #a0aec0;
+  color: #6b7280;
   text-align: right;
 }

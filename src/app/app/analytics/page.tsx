@@ -7,6 +7,7 @@ import { ProductComparisonTable } from './ProductComparisonTable';
 import { EnhancedTable } from './EnhancedTable';
 import { StackedBarChart } from './StackedBarChart';
 import { LineChart } from './LineChart';
+import { InteractiveBarChart } from './InteractiveBarChart';
 import { Suspense } from 'react';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
     const formatted = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
     return result?.totals.currency ? `${result.totals.currency} ${formatted}` : formatted;
   };
+  
 
   return (
     <div className={styles.container}>
@@ -172,35 +174,15 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               {/* Aggregate chart */}
               {chartScope === 'aggregate' && chart === 'bar' && (
                 series.length === 0 ? <p>No data in range.</p> : (
-                  <div className="analytics-chart-scroll">
-                    <svg width={svgW} height={svgH} role="img" aria-label="Chart">
-                      <g transform={`translate(${svgPadding.left},${svgPadding.top})`}>
-                        <line x1={0} y1={0} x2={0} y2={innerH} stroke="#d0d4d9" />
-                        {Array.from({ length: 5 }).map((_, i) => {
-                          const v = (maxMetric / 4) * i;
-                          const y = yScale(v);
-                          return (
-                            <g key={i}>
-                              <line x1={-4} y1={y} x2={0} y2={y} stroke="#aeb4bb" />
-                              <text x={-8} y={y + 4} textAnchor="end" fontSize={10} fill="#6b7177">{Math.round(v)}</text>
-                              <line x1={0} y1={y} x2={innerW} y2={y} stroke="#f1f3f5" />
-                            </g>
-                          );
-                        })}
-                        <line x1={0} y1={innerH} x2={innerW} y2={innerH} stroke="#d0d4d9" />
-                        {series.map((s, i) => (
-                          <text key={s.key} x={xBand(i)} y={innerH + 16} textAnchor="middle" fontSize={10} fill="#6b7177">{s.label}</text>
-                        ))}
-                        {series.map((s, i) => {
-                          const barW = Math.max(12, innerW / Math.max(1, series.length) - 24);
-                          const x = xBand(i) - barW / 2;
-                          const value = metric === 'sales' ? s.sales : s.quantity;
-                          const y = yScale(value);
-                          const h = innerH - y;
-                          return <rect key={s.key} x={x} y={y} width={barW} height={h} fill="#4facfe" />
-                        })}
-                      </g>
-                    </svg>
+                  <div className="analytics-chart-scroll" style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: '6px', backgroundColor: '#ffffff' }}>
+                    <InteractiveBarChart 
+                      series={series}
+                      metric={metric}
+                      currency={result?.totals.currency}
+                      svgWidth={svgW}
+                      svgHeight={svgH}
+                      padding={svgPadding}
+                    />
                   </div>
                 )
               )}
@@ -208,75 +190,81 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               {/* Aggregate line chart */}
               {chartScope === 'aggregate' && chart === 'line' && (
                 series.length === 0 ? <p>No data in range.</p> : (
-                  <Suspense fallback={<div>Loading line chart...</div>}>
-                    <LineChart
-                      data={[{
-                        key: 'aggregate',
-                        label: 'Aggregate',
-                        products: series.map(s => ({
-                          id: s.key,
-                          title: s.label,
-                          value: metric === 'sales' ? s.sales : s.quantity
-                        }))
-                      }]}
-                      title={`${metric === 'sales' ? 'Sales' : 'Quantity'} Over Time`}
-                      yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
-                      xAxisLabel="Time Period"
-                      height={400}
-                      formatType={metric === 'sales' ? 'money' : 'number'}
-                      currency={result?.totals?.currency}
-                    />
-                  </Suspense>
+                  <div className="analytics-chart-scroll">
+                    <Suspense fallback={<div>Loading line chart...</div>}>
+                      <LineChart
+                        data={[{
+                          key: 'aggregate',
+                          label: 'Aggregate',
+                          products: series.map(s => ({
+                            id: s.key,
+                            title: s.label,
+                            value: metric === 'sales' ? s.sales : s.quantity
+                          }))
+                        }]}
+                        title={`${metric === 'sales' ? 'Sales' : 'Quantity'} Over Time`}
+                        yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
+                        xAxisLabel="Time Period"
+                        height={400}
+                        formatType={metric === 'sales' ? 'money' : 'number'}
+                        currency={result?.totals?.currency}
+                      />
+                    </Suspense>
+                  </div>
                 )
               )}
 
               {/* By product chart: stacked bar chart with interactive legend */}
               {chartScope === 'product' && chart === 'bar' && (
                 ((result?.seriesProduct?.length ?? 0) === 0) ? <p>No data in range.</p> : (
-                  <Suspense fallback={<div>Loading stacked bar chart...</div>}>
-                    <StackedBarChart
-                      data={(result?.seriesProduct || []).map(series => ({
-                        key: series.key,
-                        label: series.label,
-                        products: Object.entries(series.per).map(([id, data]) => ({
-                          id,
-                          title: data.title,
-                          value: metric === 'sales' ? data.sales : data.qty
-                        }))
-                      }))}
-                      title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product`}
-                      yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
-                      xAxisLabel="Time Period"
-                      height={400}
-                      formatType={metric === 'sales' ? 'money' : 'number'}
-                      currency={result?.totals?.currency}
-                    />
-                  </Suspense>
+                  <div className="analytics-chart-scroll">
+                    <Suspense fallback={<div>Loading stacked bar chart...</div>}>
+                      <StackedBarChart
+                        data={(result?.seriesProduct || []).map(series => ({
+                          key: series.key,
+                          label: series.label,
+                          products: Object.entries(series.per).map(([id, data]) => ({
+                            id,
+                            title: data.title,
+                            value: metric === 'sales' ? data.sales : data.qty
+                          }))
+                        }))}
+                        title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product`}
+                        yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
+                        xAxisLabel="Time Period"
+                        height={400}
+                        formatType={metric === 'sales' ? 'money' : 'number'}
+                        currency={result?.totals?.currency}
+                      />
+                    </Suspense>
+                  </div>
                 )
               )}
               
               {/* By product chart: line chart with interactive legend */}
               {chartScope === 'product' && chart === 'line' && (
                 ((result?.seriesProduct?.length ?? 0) === 0) ? <p>No data in range.</p> : (
-                  <Suspense fallback={<div>Loading line chart...</div>}>
-                    <LineChart
-                      data={(result?.seriesProduct || []).map(series => ({
-                        key: series.key,
-                        label: series.label,
-                        products: Object.entries(series.per).map(([id, data]) => ({
-                          id,
-                          title: data.title,
-                          value: metric === 'sales' ? data.sales : data.qty
-                        }))
-                      }))}
-                      title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product Over Time`}
-                      yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
-                      xAxisLabel="Time Period"
-                      height={400}
-                      formatType={metric === 'sales' ? 'money' : 'number'}
-                      currency={result?.totals?.currency}
-                    />
-                  </Suspense>
+                  <div className="analytics-chart-scroll">
+                    <Suspense fallback={<div>Loading line chart...</div>}>
+                      <LineChart
+                        data={(result?.seriesProduct || []).map(series => ({
+                          key: series.key,
+                          label: series.label,
+                          products: Object.entries(series.per).map(([id, data]) => ({
+                            id,
+                            title: data.title,
+                            value: metric === 'sales' ? data.sales : data.qty
+                          }))
+                        }))}
+                        title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product Over Time`}
+                        yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
+                        xAxisLabel="Time Period"
+                        height={400}
+                        formatType={metric === 'sales' ? 'money' : 'number'}
+                        currency={result?.totals?.currency}
+                      />
+                    </Suspense>
+                  </div>
                 )
               )}
             </div>
@@ -598,24 +586,55 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       }
                       const a = (result?.monthlyProduct || []).find(mp => mp.key === aKey);
                       const b = (result?.monthlyProduct || []).find(mp => mp.key === bKey);
-                      if (!a || !b) return null;
+                      
+                      // If no data is available, show a message
+                      if (!a || !b) {
+                        return (
+                          <div style={{ marginTop: 16, padding: '20px', backgroundColor: '#f9fafb', borderRadius: '6px', textAlign: 'center' }}>
+                            <p>No product comparison data available for the selected months.</p>
+                            <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>Try selecting different months or check that your data contains product information.</p>
+                          </div>
+                        );
+                      }
+                      
+                      // Process the data for comparison
                       const rowsMap = new Map<string, { title: string; aQty: number; bQty: number; aSales: number; bSales: number }>();
+                      
+                      // Add products from first month
                       for (const [pid, v] of Object.entries(a.per)) {
                         rowsMap.set(pid, { title: v.title, aQty: v.qty, bQty: 0, aSales: v.sales, bSales: 0 });
                       }
+                      
+                      // Add or update products from second month
                       for (const [pid, v] of Object.entries(b.per)) {
                         const r = rowsMap.get(pid);
                         if (r) { r.bQty = v.qty; r.bSales = v.sales; }
                         else { rowsMap.set(pid, { title: v.title, aQty: 0, bQty: v.qty, aSales: 0, bSales: v.sales }); }
                       }
-                      const rows = Array.from(rowsMap.entries()).map(([pid, r]) => ({ 
-                        id: pid, 
-                        title: r.title, 
-                        currQty: r.bQty, 
-                        prevQty: r.aQty, 
-                        currSales: r.bSales, 
-                        prevSales: r.aSales 
-                      }));
+                      
+                      // Convert to array format expected by ProductComparisonTable
+                      const rows = Array.from(rowsMap.entries())
+                        .map(([pid, r]) => ({ 
+                          id: pid, 
+                          title: r.title, 
+                          currQty: r.bQty, 
+                          prevQty: r.aQty, 
+                          currSales: r.bSales, 
+                          prevSales: r.aSales 
+                        }))
+                        // Filter out rows with no data
+                        .filter(row => row.currQty > 0 || row.prevQty > 0 || row.currSales > 0 || row.prevSales > 0);
+                      
+                      // If no rows after filtering, show a message
+                      if (rows.length === 0) {
+                        return (
+                          <div style={{ marginTop: 16, padding: '20px', backgroundColor: '#f9fafb', borderRadius: '6px', textAlign: 'center' }}>
+                            <p>No product comparison data available for the selected months.</p>
+                            <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>Try selecting different months or check that your data contains product information.</p>
+                          </div>
+                        );
+                      }
+                      
                       const aLabel = result?.monthlyDict?.[aKey]?.label || aKey;
                       const bLabel = result?.monthlyDict?.[bKey]?.label || bKey;
                       const periodLabel = `${aLabel} → ${bLabel}`;
@@ -733,18 +752,42 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         };
                         const currMap = sumPer(currMonths);
                         const prevMap = sumPer(prevMonths);
-                        const rows = Array.from(new Set([...currMap.keys(), ...prevMap.keys()])).map(pid => {
-                          const c = currMap.get(pid) || { title: pid, qty: 0, sales: 0 };
-                          const p = prevMap.get(pid) || { title: c.title, qty: 0, sales: 0 };
-                          return { 
-                            id: pid, 
-                            title: c.title || p.title, 
-                            currQty: c.qty, 
-                            prevQty: p.qty, 
-                            currSales: c.sales, 
-                            prevSales: p.sales 
-                          };
-                        });
+                        
+                        // If no data is available, show a message
+                        if (currMap.size === 0 && prevMap.size === 0) {
+                          return (
+                            <div style={{ marginTop: 16, padding: '20px', backgroundColor: '#f9fafb', borderRadius: '6px', textAlign: 'center' }}>
+                              <p>No product comparison data available for year-over-year analysis.</p>
+                              <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>Check that your data contains product information for both current and previous year periods.</p>
+                            </div>
+                          );
+                        }
+                        
+                        const rows = Array.from(new Set([...currMap.keys(), ...prevMap.keys()]))
+                          .map(pid => {
+                            const c = currMap.get(pid) || { title: pid, qty: 0, sales: 0 };
+                            const p = prevMap.get(pid) || { title: c.title, qty: 0, sales: 0 };
+                            return { 
+                              id: pid, 
+                              title: c.title || p.title, 
+                              currQty: c.qty, 
+                              prevQty: p.qty, 
+                              currSales: c.sales, 
+                              prevSales: p.sales 
+                            };
+                          })
+                          // Filter out rows with no meaningful data
+                          .filter(row => row.currQty > 0 || row.prevQty > 0 || row.currSales > 0 || row.prevSales > 0);
+                        
+                        // If no rows after filtering, show a message
+                        if (rows.length === 0) {
+                          return (
+                            <div style={{ marginTop: 16, padding: '20px', backgroundColor: '#f9fafb', borderRadius: '6px', textAlign: 'center' }}>
+                              <p>No product comparison data available for year-over-year analysis.</p>
+                              <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '8px' }}>Check that your data contains product information for both current and previous year periods.</p>
+                            </div>
+                          );
+                        }
                         
                         return (
                           <div style={{ marginTop: 16 }}>

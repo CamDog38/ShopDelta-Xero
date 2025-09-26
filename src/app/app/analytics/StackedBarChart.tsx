@@ -150,8 +150,19 @@ export function StackedBarChart({
     return formatType === 'number' ? value.toString() : String(value);
   };
   
-  // Calculate bar width
-  const barWidth = 100 / data.length;
+  // Format tooltip content
+  const formatTooltipContent = (product: { id: string; title: string; value: number }, periodLabel: string) => {
+    const valueFormatted = formatValueWithCurrency(product.value);
+    return (
+      `<div style="font-weight: bold; margin-bottom: 4px;">${product.title}</div>
+       <div>Period: ${periodLabel}</div>
+       <div>Value: ${valueFormatted}</div>`
+    );
+  };
+  
+  // Calculate chart dimensions
+  const chartWidth = data.length * 100; // Each data point gets 100px width
+  const minWidth = Math.max(chartWidth, Math.min(1200, window.innerWidth - 100)); // Responsive width
   
   // Filter for product dropdown
   const [filterValue, setFilterValue] = useState('all');
@@ -173,7 +184,8 @@ export function StackedBarChart({
       {title && <h4 className={styles.sectionTitle}>{title}</h4>}
       
       <div className="stacked-bar-legend" style={{ marginBottom: '16px' }}>
-        <div className="stacked-bar-legend-items" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+        <h4 style={{ marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Legend:</h4>
+        <div className="stacked-bar-legend-items" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
           {allProductIds.map(id => {
             const product = data.flatMap(d => d.products).find(p => p.id === id);
             if (!product) return null;
@@ -187,9 +199,12 @@ export function StackedBarChart({
                   alignItems: 'center', 
                   cursor: 'pointer',
                   opacity: visibleProducts[id] ? 1 : 0.5,
-                  padding: '4px 8px',
+                  padding: '6px 10px',
                   borderRadius: '4px',
-                  backgroundColor: hoveredProduct === id ? 'rgba(255,255,255,0.1)' : 'transparent'
+                  backgroundColor: hoveredProduct === id ? '#f3f4f6' : '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  boxShadow: hoveredProduct === id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  transition: 'all 0.2s ease'
                 }}
                 onClick={() => toggleProductVisibility(id)}
                 onMouseEnter={() => setHoveredProduct(id)}
@@ -198,14 +213,15 @@ export function StackedBarChart({
                 <div 
                   className="stacked-bar-legend-color" 
                   style={{ 
-                    width: '12px', 
-                    height: '12px', 
+                    width: '14px', 
+                    height: '14px', 
                     backgroundColor: productColors[id],
-                    borderRadius: '2px',
-                    marginRight: '8px'
+                    borderRadius: '3px',
+                    marginRight: '8px',
+                    border: '1px solid rgba(0,0,0,0.1)'
                   }} 
                 />
-                <span>{product.title}</span>
+                <span style={{ fontWeight: 500 }}>{product.title}</span>
               </div>
             );
           })}
@@ -220,9 +236,9 @@ export function StackedBarChart({
             onChange={handleFilterChange}
             style={{
               padding: '8px 12px',
-              backgroundColor: '#1e1e1e',
-              color: '#e5e7eb',
-              border: '1px solid #4a5568',
+              backgroundColor: '#ffffff',
+              color: '#111827',
+              border: '1px solid #d1d5db',
               borderRadius: '4px'
             }}
           >
@@ -238,12 +254,22 @@ export function StackedBarChart({
         </div>
       </div>
       
+      <div className="line-chart-scroll-container" style={{ 
+        overflowX: 'auto', 
+        overflowY: 'hidden',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        backgroundColor: '#ffffff',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+      }}>
       <div 
         className="stacked-bar-chart" 
         style={{ 
           position: 'relative',
           height: `${height}px`,
-          marginBottom: '40px'
+          width: `${minWidth}px`,
+          marginBottom: '40px',
+          padding: '20px 10px'
         }}
         ref={chartRef}
         onMouseLeave={handleMouseLeave}
@@ -252,18 +278,19 @@ export function StackedBarChart({
         <div 
           className="stacked-bar-y-axis" 
           style={{ 
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: '40px',
-            width: '50px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            paddingRight: '10px',
-            color: '#a0aec0',
-            fontSize: '12px'
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: '40px',
+              width: '70px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+              paddingRight: '10px',
+              color: '#6b7280',
+              fontSize: '12px',
+              fontWeight: 500
           }}
         >
           {yAxisTicks.reverse().map((tick, i) => (
@@ -271,34 +298,19 @@ export function StackedBarChart({
           ))}
         </div>
         
-        {/* Y-axis label */}
-        {yAxisLabel && (
-          <div 
-            style={{ 
-              position: 'absolute',
-              left: '-40px',
-              top: '50%',
-              transform: 'rotate(-90deg) translateX(50%)',
-              transformOrigin: 'center',
-              color: '#a0aec0',
-              fontSize: '12px'
-            }}
-          >
-            {yAxisLabel}
-          </div>
-        )}
-        
         {/* Chart area */}
         <div 
           className="stacked-bar-chart-area" 
           style={{ 
-            position: 'absolute',
-            left: '60px',
-            right: '20px',
-            top: 0,
-            bottom: '40px',
-            borderLeft: '1px solid #4a5568',
-            borderBottom: '1px solid #4a5568',
+              position: 'absolute',
+              left: '80px',
+              right: '20px',
+              top: 0,
+              bottom: '40px',
+              borderLeft: '1px solid #d1d5db',
+              borderBottom: '1px solid #d1d5db',
+              backgroundColor: '#f9fafb',
+              borderRadius: '4px'
           }}
         >
           {/* Horizontal grid lines */}
@@ -310,13 +322,12 @@ export function StackedBarChart({
                 left: 0,
                 right: 0,
                 bottom: `${(tick / yAxisMax) * 100}%`,
-                borderTop: '1px dashed rgba(74, 85, 104, 0.3)',
+                  borderTop: '1px dashed rgba(209, 213, 219, 0.8)',
                 pointerEvents: 'none'
               }}
             />
           ))}
           
-          {/* Bars */}
           {data.map((d, i) => {
             const visibleProductsData = d.products.filter(p => visibleProducts[p.id]);
             const total = visibleProductsData.reduce((sum, p) => sum + p.value, 0);
@@ -331,7 +342,7 @@ export function StackedBarChart({
                 style={{
                   position: 'absolute',
                   left: `${(i / data.length) * 100}%`,
-                  width: `${barWidth}%`,
+                  width: `${100 / data.length}%`,
                   bottom: 0,
                   height: '100%',
                   display: 'flex',
@@ -371,7 +382,7 @@ export function StackedBarChart({
                         setTooltipContent({
                           x: e.clientX - (chartRef.current?.getBoundingClientRect().left || 0),
                           y: e.clientY - (chartRef.current?.getBoundingClientRect().top || 0),
-                          content: `${product.title}: ${formatValueWithCurrency(product.value)}`
+                          content: formatTooltipContent(product, d.label)
                         });
                       }}
                       onMouseMove={handleMouseMove}
@@ -389,7 +400,7 @@ export function StackedBarChart({
                     position: 'absolute',
                     bottom: '-30px',
                     fontSize: '12px',
-                    color: '#a0aec0',
+                    color: '#6b7280',
                     textAlign: 'center',
                     width: '100%',
                     overflow: 'hidden',
@@ -408,7 +419,9 @@ export function StackedBarChart({
                       bottom: `${barHeight}%`,
                       fontSize: '12px',
                       fontWeight: 'bold',
-                      color: '#e5e7eb',
+                      color: '#111827',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderRadius: '4px',
                       textAlign: 'center',
                       width: '100%',
                       transform: 'translateY(-100%)',
@@ -431,7 +444,7 @@ export function StackedBarChart({
               bottom: '5px',
               left: '50%',
               transform: 'translateX(-50%)',
-              color: '#a0aec0',
+              color: '#6b7280',
               fontSize: '12px'
             }}
           >
@@ -446,19 +459,21 @@ export function StackedBarChart({
               position: 'absolute',
               left: `${tooltipContent.x + 10}px`,
               top: `${tooltipContent.y - 10}px`,
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
               color: '#fff',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              fontSize: '12px',
+              padding: '10px 14px',
+              borderRadius: '6px',
+              fontSize: '13px',
               pointerEvents: 'none',
               zIndex: 100,
-              whiteSpace: 'nowrap'
+              boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              minWidth: '150px'
             }}
-          >
-            {tooltipContent.content}
-          </div>
+            dangerouslySetInnerHTML={{ __html: tooltipContent.content }}
+          />
         )}
+      </div>
       </div>
     </div>
   );

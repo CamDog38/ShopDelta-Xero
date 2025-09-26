@@ -104,6 +104,13 @@ export function ProductComparisonTable({ data, currency, periodLabel }: ProductC
     if (value === null) return '-';
     return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
   };
+  
+  // Get color for delta values
+  const getDeltaColor = (value: number) => {
+    if (value > 0) return '#16a34a'; // Green for positive
+    if (value < 0) return '#dc2626'; // Red for negative
+    return undefined; // Default color for zero
+  };
 
   return (
     <div className="enhanced-table">
@@ -128,47 +135,47 @@ export function ProductComparisonTable({ data, currency, periodLabel }: ProductC
         </div>
       </div>
 
-      {/* Table wrapper */}
-      <div className="enhanced-table-wrapper">
-        <table className="enhanced-table-table">
+      {/* Table wrapper with horizontal scroll */}
+      <div className="enhanced-table-wrapper" style={{ overflowX: 'auto' }}>
+        <table className="enhanced-table-table" style={{ minWidth: '900px' }}>
           <thead>
             <tr>
               <th
                 className={`enhanced-table-header enhanced-table-sortable`}
                 onClick={() => handleSort('title')}
-                style={{ textAlign: 'left' }}
+                style={{ textAlign: 'left', minWidth: '180px' }}
               >
                 <div className="enhanced-table-header-content">
                   <span>Product</span>
                   <span className="enhanced-table-sort-indicator">{getSortIndicator('title')}</span>
                 </div>
               </th>
-              <th className="enhanced-table-header" style={{ textAlign: 'center' }}>Qty<br/>(Curr)</th>
-              <th className="enhanced-table-header" style={{ textAlign: 'center' }}>Qty<br/>(Prev)</th>
+              <th className="enhanced-table-header" style={{ textAlign: 'center', minWidth: '80px' }}>Qty<br/>(Curr)</th>
+              <th className="enhanced-table-header" style={{ textAlign: 'center', minWidth: '80px' }}>Qty<br/>(Prev)</th>
               <th
                 className={`enhanced-table-header enhanced-table-sortable`}
                 onClick={() => handleSort('deltaQty')}
-                style={{ textAlign: 'center' }}
+                style={{ textAlign: 'center', minWidth: '80px' }}
               >
                 <div className="enhanced-table-header-content">
                   <span>Qty<br/>Δ</span>
                   <span className="enhanced-table-sort-indicator">{getSortIndicator('deltaQty')}</span>
                 </div>
               </th>
-              <th className="enhanced-table-header" style={{ textAlign: 'center' }}>Qty<br/>Δ%</th>
-              <th className="enhanced-table-header" style={{ textAlign: 'center' }}>Sales<br/>(Curr)</th>
-              <th className="enhanced-table-header" style={{ textAlign: 'center' }}>Sales<br/>(Prev)</th>
+              <th className="enhanced-table-header" style={{ textAlign: 'center', minWidth: '80px' }}>Qty<br/>Δ%</th>
+              <th className="enhanced-table-header" style={{ textAlign: 'center', minWidth: '100px' }}>Sales<br/>(Curr)</th>
+              <th className="enhanced-table-header" style={{ textAlign: 'center', minWidth: '100px' }}>Sales<br/>(Prev)</th>
               <th
                 className={`enhanced-table-header enhanced-table-sortable`}
                 onClick={() => handleSort('deltaSales')}
-                style={{ textAlign: 'center' }}
+                style={{ textAlign: 'center', minWidth: '100px' }}
               >
                 <div className="enhanced-table-header-content">
                   <span>Sales<br/>Δ</span>
                   <span className="enhanced-table-sort-indicator">{getSortIndicator('deltaSales')}</span>
                 </div>
               </th>
-              <th className="enhanced-table-header" style={{ textAlign: 'center' }}>Sales<br/>Δ%</th>
+              <th className="enhanced-table-header" style={{ textAlign: 'center', minWidth: '80px' }}>Sales<br/>Δ%</th>
             </tr>
           </thead>
           <tbody>
@@ -191,24 +198,42 @@ export function ProductComparisonTable({ data, currency, periodLabel }: ProductC
                     className="enhanced-table-cell"
                     style={{
                       textAlign: 'center',
-                      color: product.deltaQty > 0 ? '#48bb78' : product.deltaQty < 0 ? '#f56565' : undefined,
+                      color: getDeltaColor(product.deltaQty),
+                      fontWeight: product.deltaQty !== 0 ? 600 : undefined
                     }}
                   >
                     {product.deltaQty}
                   </td>
-                  <td className="enhanced-table-cell" style={{ textAlign: 'center' }}>{formatPercent(product.deltaQtyPercent)}</td>
+                  <td 
+                    className="enhanced-table-cell" 
+                    style={{ 
+                      textAlign: 'center',
+                      color: product.deltaQtyPercent ? getDeltaColor(product.deltaQtyPercent) : undefined
+                    }}
+                  >
+                    {formatPercent(product.deltaQtyPercent)}
+                  </td>
                   <td className="enhanced-table-cell" style={{ textAlign: 'center' }}>{fmtMoney(product.currSales)}</td>
                   <td className="enhanced-table-cell" style={{ textAlign: 'center' }}>{fmtMoney(product.prevSales)}</td>
                   <td
                     className="enhanced-table-cell"
                     style={{
                       textAlign: 'center',
-                      color: product.deltaSales > 0 ? '#48bb78' : product.deltaSales < 0 ? '#f56565' : undefined,
+                      color: getDeltaColor(product.deltaSales),
+                      fontWeight: product.deltaSales !== 0 ? 600 : undefined
                     }}
                   >
                     {fmtMoney(product.deltaSales)}
                   </td>
-                  <td className="enhanced-table-cell" style={{ textAlign: 'center' }}>{formatPercent(product.deltaSalesPercent)}</td>
+                  <td 
+                    className="enhanced-table-cell" 
+                    style={{ 
+                      textAlign: 'center',
+                      color: product.deltaSalesPercent ? getDeltaColor(product.deltaSalesPercent) : undefined
+                    }}
+                  >
+                    {formatPercent(product.deltaSalesPercent)}
+                  </td>
                 </tr>
               ))
             )}

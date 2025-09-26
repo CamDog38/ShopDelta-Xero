@@ -179,9 +179,9 @@ export function EnhancedTable<T extends Record<string, any>>({
         </div>
       </div>
       
-      {/* Table with horizontal scroll */}
-      <div className="enhanced-table-wrapper" style={{ maxHeight }}>
-        <table className="enhanced-table-table">
+      {/* Table with horizontal and vertical scroll */}
+      <div className="enhanced-table-wrapper" style={{ maxHeight, overflowX: 'auto' }}>
+        <table className="enhanced-table-table" style={{ minWidth: '800px' }}>
           <thead>
             <tr>
               {columns.map(column => (

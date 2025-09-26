@@ -401,15 +401,16 @@ export function LineChart({
               
               // Calculate points for the SVG path
               const chartWidth = data.length > 1 ? (data.length - 1) : 1;
+              // Coordinates in a 0..100 logical space for use with SVG viewBox
               const points = series.points.map((p, i) => ({
-                x: `${(i / chartWidth) * 100}%`,
-                y: `${100 - (p.y / yAxisMax) * 100}%`,
+                x: (i / chartWidth) * 100,
+                y: 100 - (p.y / yAxisMax) * 100,
                 value: p.value,
                 label: p.label
               }));
               
               // Create SVG path
-              const pathD = points.map((p, i) => 
+              const pathD = points.map((p, i) =>
                 `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`
               ).join(' ');
               
@@ -419,6 +420,8 @@ export function LineChart({
                   <svg 
                     width="100%" 
                     height="100%" 
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
                     style={{ 
                       position: 'absolute',
                       top: 0,
@@ -444,8 +447,8 @@ export function LineChart({
                       key={i}
                       style={{
                         position: 'absolute',
-                        left: point.x,
-                        top: point.y,
+                        left: `${point.x}%`,
+                        top: `${point.y}%`,
                         width: '14px',
                         height: '14px',
                         borderRadius: '50%',

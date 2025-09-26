@@ -197,6 +197,11 @@
   max-width: 100%;
 }
 
+.page-module__JnUBza__container {
+  max-width: 80vw;
+  overflow-x: hidden;
+}
+
 /* Ensure the page content container never lets cards overflow viewport */
 .layout-module__u5iuSq__content {
   overflow-x: hidden; /* hide any accidental outer overflow */

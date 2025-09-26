@@ -283,72 +283,51 @@ export function LineChart({
         </div>
       </div>
       
-      <div className="line-chart-scroll-container" style={{ 
-        overflowX: 'auto', 
-        overflowY: 'hidden',
-        border: '1px solid #e5e7eb',
-        borderRadius: '6px',
-        backgroundColor: '#ffffff'
-      }}>
+      {/* Frame splits into fixed Y-axis (left) and horizontally scrollable chart (right) */}
+      <div className="line-chart-frame" style={{ display: 'flex', border: '1px solid #e5e7eb', borderRadius: '6px', backgroundColor: '#ffffff' }}>
+        {/* Fixed Y-axis */}
         <div 
-          className="line-chart" 
+          className="line-chart-y-axis-fixed" 
           style={{ 
-            position: 'relative',
+            flex: '0 0 70px',
             height: `${height}px`,
-            width: `${minWidth}px`,
-            marginBottom: '40px',
-            padding: '20px 10px'
+            position: 'relative',
+            padding: '20px 10px 40px 10px',
+            borderRight: '1px solid #e5e7eb',
+            backgroundColor: '#ffffff'
           }}
-          ref={chartRef}
-          onMouseLeave={handleMouseLeave}
         >
-          {/* Y-axis */}
-          <div 
-            className="line-chart-y-axis" 
-            style={{ 
-              position: 'absolute',
-              left: 0,
-              top: 0,
-              bottom: '40px',
-              width: '60px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              alignItems: 'flex-end',
-              paddingRight: '10px',
-              color: '#6b7280',
-              fontSize: '12px',
-              fontWeight: 500
-            }}
-          >
-            {yAxisTicks.reverse().map((tick, i) => (
+          <div style={{ position: 'absolute', inset: '20px 10px 40px 10px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', color: '#6b7280', fontSize: '12px', fontWeight: 500 }}>
+            {yAxisTicks.slice().reverse().map((tick, i) => (
               <div key={i} style={{ transform: 'translateY(50%)' }}>{tick}</div>
             ))}
           </div>
-          
-          {/* Y-axis label */}
           {yAxisLabel && (
-            <div 
-              style={{ 
-                position: 'absolute',
-                left: '-40px',
-                top: '50%',
-                transform: 'rotate(-90deg) translateX(50%)',
-                transformOrigin: 'center',
-                color: '#6b7280',
-                fontSize: '12px'
-              }}
-            >
+            <div style={{ position: 'absolute', left: '-40px', top: '50%', transform: 'rotate(-90deg) translateX(50%)', transformOrigin: 'center', color: '#6b7280', fontSize: '12px' }}>
               {yAxisLabel}
             </div>
           )}
-          
-          {/* Chart area */}
+        </div>
+
+        {/* Scrollable chart content */}
+        <div className="line-chart-scroll-container" style={{ overflowX: 'auto', overflowY: 'hidden', borderRadius: '0 6px 6px 0', backgroundColor: '#ffffff' }}>
+          <div 
+            className="line-chart" 
+            style={{ 
+              position: 'relative',
+              height: `${height}px`,
+              width: `${minWidth}px`,
+              marginBottom: '40px',
+              padding: '20px 10px'
+            }}
+            ref={chartRef}
+            onMouseLeave={handleMouseLeave}
+          >
           <div 
             className="line-chart-area" 
             style={{ 
               position: 'absolute',
-              left: '70px',
+              left: 0,
               right: '20px',
               top: 0,
               bottom: '40px',
@@ -435,7 +414,7 @@ export function LineChart({
                       d={pathD}
                       fill="none"
                       stroke={series.color}
-                      strokeWidth={isHighlighted ? 4 : 3}
+                      strokeWidth={isHighlighted ? 0.4 : 0.3}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />

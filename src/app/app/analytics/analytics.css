@@ -153,6 +153,7 @@
 .stacked-bar-chart-container {
   margin-bottom: 24px;
   width: 100%;
+  padding: 16px;
 }
 
 .stacked-bar-legend-item {
@@ -226,6 +227,7 @@
 .line-chart-container {
   margin-bottom: 24px;
   width: 100%;
+  padding: 16px;
 }
 
 .line-chart-scroll-container {

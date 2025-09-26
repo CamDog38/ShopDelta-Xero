@@ -189,11 +189,12 @@
 /* Ensure all chart cards stay within viewport */
 .analytics-card {
   max-width: 100%;
-  overflow: hidden;
+  overflow: hidden; /* card stays fixed; inner scroll handles overflow */
 }
 
 .analytics-card .analytics-chart-scroll {
-  max-width: calc(100vw - 80px);
+  width: 100%;
+  max-width: 100%;
 }
 
 /* Line Chart Styles */

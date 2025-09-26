@@ -271,6 +271,8 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   const seriesProductMap = new Map<string, Map<string, { qty: number; sales: number; title: string }>>();
   let productItemMatches = 0;
   let productHeuristicMatches = 0;
+  
+  console.log('🔍 [STARTING PRODUCT BREAKDOWN] Processing', invoices.length, 'invoices');
 
   function normalizeText(s?: string) {
     return (s || '')
@@ -291,6 +293,20 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const key = bucketKey(dt, granularity);
     let perBucket = seriesProductMap.get(key);
     if (!perBucket) { perBucket = new Map(); seriesProductMap.set(key, perBucket); }
+    console.log('📋 [PROCESSING INVOICE]', { 
+      id: inv.invoiceID || inv.invoiceNumber, 
+      date: inv.date, 
+      type: inv.type, 
+      lineItemsCount: Array.isArray(inv.lineItems) ? inv.lineItems.length : 0,
+      sampleLineItems: Array.isArray(inv.lineItems) ? inv.lineItems.slice(0, 2).map(li => ({
+        itemCode: li.itemCode,
+        description: li.description,
+        quantity: li.quantity,
+        unitAmount: li.unitAmount,
+        lineAmount: li.lineAmount
+      })) : []
+    });
+    
     if (Array.isArray(inv.lineItems)) {
       for (const li of inv.lineItems as LineItemLite[]) {
         const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
@@ -316,6 +332,18 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
         let q = li.quantity;
         if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }
         const liQty = sign * Number(q ?? 0);
+        
+        console.log('🔍 [LINE ITEM PROCESSING]', {
+          itemCode: li.itemCode,
+          description: li.description,
+          originalQty: li.quantity,
+          inferredQty: q,
+          hasAmount,
+          liQty,
+          pid,
+          title,
+          matchType: itemInfo ? 'exact' : 'none'
+        });
         const fallbackAmt = (li.unitAmount ?? 0) * (li.quantity ?? 0);
         const chosenAmt = li.lineAmount ?? fallbackAmt;
         const liSales = sign * (Number(chosenAmt || 0) - Number(li.taxAmount ?? 0));

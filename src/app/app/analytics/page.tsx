@@ -2,7 +2,6 @@ import styles from '../page.module.css';
 import '@/app/app/analytics/analytics.css';
 import { getXeroSession } from '@/lib/session';
 import { getXeroAnalytics, type XeroAnalyticsFilters } from './xero-analytics.server';
-import DebugTerminal from './DebugTerminal';
 import { ProductTable } from './ProductTable';
 import { ProductComparisonTable } from './ProductComparisonTable';
 import { EnhancedTable } from './EnhancedTable';
@@ -303,7 +302,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       {
                         id: 'timePeriod',
                         header: 'Time Period',
-                        accessor: (row: Record<string, any>) => row.timePeriod,
+                        accessorKey: 'timePeriod',
                         sortable: true,
                         align: 'left',
                         width: '150px'
@@ -311,11 +310,10 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       ...(result?.productLegend || []).map(p => ({
                         id: p.id,
                         header: p.title,
-                        accessor: (row: Record<string, any>) => metric === 'sales' 
-                          ? fmtMoney(row[p.id] || 0) 
-                          : row[p.id] || 0,
+                        accessorKey: p.id,
                         sortable: true,
-                        align: 'right' as const
+                        align: 'right' as const,
+                        format: (metric === 'sales' ? 'money' : 'number') as 'money' | 'number'
                       }))
                     ]}
                     keyField="timePeriod"
@@ -323,6 +321,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                     subtitle={`Showing ${metric === 'sales' ? 'sales' : 'quantity'} for each product across time periods`}
                     searchPlaceholder="Search by time period or product..."
                     maxHeight="600px"
+                    currency={result?.totals?.currency}
                   />
                 </Suspense>
               ) : (
@@ -337,7 +336,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       {
                         id: 'label',
                         header: 'Time Period',
-                        accessor: (row: Record<string, any>) => row.label,
+                        accessorKey: 'label',
                         sortable: true,
                         align: 'left',
                         width: '150px'
@@ -345,9 +344,10 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                       {
                         id: 'value',
                         header: metric === 'sales' ? 'Sales' : 'Quantity',
-                        accessor: (row: Record<string, any>) => metric === 'sales' ? fmtMoney(row.value) : row.value,
+                        accessorKey: 'value',
                         sortable: true,
-                        align: 'right'
+                        align: 'right',
+                        format: (metric === 'sales' ? 'money' : 'number') as 'money' | 'number'
                       }
                     ]}
                     keyField="key"
@@ -355,6 +355,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                     subtitle={`Showing ${metric === 'sales' ? 'sales' : 'quantity'} across time periods`}
                     searchPlaceholder="Search by time period..."
                     maxHeight="600px"
+                    currency={result?.totals?.currency}
                   />
                 </Suspense>
               )}
@@ -389,7 +390,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                     {
                       id: 'rank',
                       header: '#',
-                      accessor: row => row.rank,
+                      accessorKey: 'rank',
                       sortable: true,
                       align: 'left',
                       width: '50px'
@@ -397,22 +398,24 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                     {
                       id: 'title',
                       header: 'Product',
-                      accessor: row => row.title,
+                      accessorKey: 'title',
                       sortable: true,
                       align: 'left'
                     },
                     {
                       id: 'qty',
                       header: 'Qty',
-                      accessor: row => row.qty,
+                      accessorKey: 'qty',
                       sortable: true,
                       align: 'right',
-                      width: '100px'
+                      width: '100px',
+                      format: 'number'
                     }
                   ]}
                   keyField="id"
                   searchPlaceholder="Search products..."
                   maxHeight="400px"
+                  currency={result?.totals?.currency}
                 />
               </Suspense>
 
@@ -429,7 +432,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                     {
                       id: 'rank',
                       header: '#',
-                      accessor: row => row.rank,
+                      accessorKey: 'rank',
                       sortable: true,
                       align: 'left',
                       width: '50px'
@@ -437,22 +440,24 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                     {
                       id: 'title',
                       header: 'Product',
-                      accessor: row => row.title,
+                      accessorKey: 'title',
                       sortable: true,
                       align: 'left'
                     },
                     {
                       id: 'sales',
                       header: 'Sales',
-                      accessor: row => fmtMoney(row.sales),
+                      accessorKey: 'sales',
                       sortable: true,
                       align: 'right',
-                      width: '120px'
+                      width: '120px',
+                      format: 'money'
                     }
                   ]}
                   keyField="id"
                   searchPlaceholder="Search products..."
                   maxHeight="400px"
+                  currency={result?.totals?.currency}
                 />
               </Suspense>
 
@@ -761,7 +766,6 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
           )}
         </>
       )}
-      <DebugTerminal />
     </div>
   );
 }

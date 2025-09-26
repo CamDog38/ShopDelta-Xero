@@ -6,10 +6,11 @@ import styles from '../page.module.css';
 type ColumnDefinition<T> = {
   id: string;
   header: string;
-  accessor: (row: T) => ReactNode;
+  accessorKey: keyof T & string; // key in the row to display
   sortable?: boolean;
   align?: 'left' | 'center' | 'right';
   width?: string;
+  format?: 'string' | 'number' | 'money';
 };
 
 type EnhancedTableProps<T> = {
@@ -21,9 +22,10 @@ type EnhancedTableProps<T> = {
   searchPlaceholder?: string;
   emptyMessage?: string;
   maxHeight?: string;
+  currency?: string;
 };
 
-export function EnhancedTable<T>({
+export function EnhancedTable<T extends Record<string, any>>({
   data,
   columns,
   keyField,
@@ -31,7 +33,8 @@ export function EnhancedTable<T>({
   subtitle,
   searchPlaceholder = 'Search...',
   emptyMessage = 'No data available',
-  maxHeight = '500px'
+  maxHeight = '500px',
+  currency,
 }: EnhancedTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<string | null>(null);
@@ -91,7 +94,7 @@ export function EnhancedTable<T>({
       filtered = filtered.filter(row => {
         return columns.some(column => {
           if (!visibleColumns[column.id]) return false;
-          const value = column.accessor(row);
+          const value = row[column.accessorKey];
           return String(value).toLowerCase().includes(searchLower);
         });
       });
@@ -106,7 +109,7 @@ export function EnhancedTable<T>({
       
       const filterLower = filterValue.toLowerCase();
       filtered = filtered.filter(row => {
-        const value = column.accessor(row);
+        const value = row[column.accessorKey];
         return String(value).toLowerCase().includes(filterLower);
       });
     });
@@ -116,8 +119,8 @@ export function EnhancedTable<T>({
       const column = columns.find(col => col.id === sortField);
       if (column) {
         filtered = [...filtered].sort((a, b) => {
-          const aValue = column.accessor(a);
-          const bValue = column.accessor(b);
+          const aValue = a[column.accessorKey];
+          const bValue = b[column.accessorKey];
           
           // Handle different types of values
           if (typeof aValue === 'number' && typeof bValue === 'number') {
@@ -236,7 +239,13 @@ export function EnhancedTable<T>({
                         style={{ textAlign: column.align || 'left' }}
                         className="enhanced-table-cell"
                       >
-                        {column.accessor(row)}
+                        {(() => {
+                          const raw = row[column.accessorKey];
+                          if (column.format === 'money' && typeof raw === 'number' && currency) {
+                            return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(raw);
+                          }
+                          return String(raw ?? '');
+                        })()}
                       </td>
                     )
                   ))}

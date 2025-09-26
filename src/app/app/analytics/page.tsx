@@ -2,6 +2,7 @@ import styles from '../page.module.css';
 import '@/app/app/analytics/analytics.css';
 import { getXeroSession } from '@/lib/session';
 import { getXeroAnalytics, type XeroAnalyticsFilters } from './xero-analytics.server';
+import DebugTerminal from './DebugTerminal';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   const metric = (typeof sp.metric === 'string' ? sp.metric : 'qty') as 'qty' | 'sales';
   const chartScope = (typeof sp.chartScope === 'string' ? sp.chartScope : 'aggregate') as 'aggregate' | 'product';
   const chart = (typeof sp.chart === 'string' ? sp.chart : 'bar') as 'bar' | 'line';
+  const compareType = (typeof sp.compareType === 'string' ? sp.compareType : 'mom') as 'mom' | 'yoy';
+  const compareScope = (typeof sp.compareScope === 'string' ? sp.compareScope : 'total') as 'total' | 'product';
 
   const filters: XeroAnalyticsFilters = {
     preset: (typeof sp.preset === 'string' ? sp.preset : 'last30') as any,
@@ -358,69 +361,80 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
           {/* Compare */}
           {view === 'compare' && (
             <div className={`${styles.card} analytics-card`}>
-              <h3 className={styles.sectionTitle}>Month-over-Month</h3>
-              {((result?.mom || []).length === 0) ? <p>No month-over-month data available.</p> : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Period</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Curr)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Prev)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty Δ</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Curr)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Prev)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales Δ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(result?.mom ?? []).map((r) => (
-                      <tr key={r.period}>
-                        <td style={{ padding: '8px 6px' }}>{r.period}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.curr.qty}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.prev.qty}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{(r.curr.qty - r.prev.qty).toFixed(0)}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales)}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.prev.sales)}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales - r.prev.sales)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+              <div className="analytics-header">
+                <div className="analytics-segmented">
+                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareType: 'mom' }).toString()}`} className={compareType === 'mom' ? '' : 'analytics-muted'}>📊 Month-over-Month</a>
+                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareType: 'yoy' }).toString()}`} className={compareType === 'yoy' ? '' : 'analytics-muted'}>📅 Year-over-Year</a>
+                  <span className="spacer-16" />
+                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareScope: 'total' }).toString()}`} className={compareScope === 'total' ? '' : 'analytics-muted'}>📈 Overall Totals</a>
+                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare', compareScope: 'product' }).toString()}`} className={compareScope === 'product' ? '' : 'analytics-muted'}>🏷️ By Product</a>
+                </div>
+              </div>
 
-              <h3 className={styles.sectionTitle}>Year-over-Year</h3>
-              {((result?.yoy || []).length === 0) ? <p>No year-over-year data available.</p> : (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Month</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Curr)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Prev)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty Δ</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Curr)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Prev)</th>
-                      <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales Δ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(result?.yoy ?? []).map((r) => (
-                      <tr key={r.month}>
-                        <td style={{ padding: '8px 6px' }}>{r.month}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.curr.qty}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.prev.qty}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{(r.curr.qty - r.prev.qty).toFixed(0)}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales)}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.prev.sales)}</td>
-                        <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales - r.prev.sales)}</td>
+              {compareType === 'mom' ? (
+                ((result?.mom || []).length === 0) ? <p>No month-over-month data available.</p> : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Period</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Curr)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Prev)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty Δ</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Curr)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Prev)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales Δ</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {(result?.mom ?? []).map((r) => (
+                        <tr key={r.period}>
+                          <td style={{ padding: '8px 6px' }}>{r.period}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.curr.qty}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.prev.qty}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{(r.curr.qty - r.prev.qty).toFixed(0)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.prev.sales)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales - r.prev.sales)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              ) : (
+                ((result?.yoy || []).length === 0) ? <p>No year-over-year data available.</p> : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Month</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Curr)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty (Prev)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Qty Δ</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Curr)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales (Prev)</th>
+                        <th style={{ textAlign: 'right', padding: '8px 6px', borderBottom: '1px solid #e5e7eb' }}>Sales Δ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(result?.yoy ?? []).map((r) => (
+                        <tr key={r.month}>
+                          <td style={{ padding: '8px 6px' }}>{r.month}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.curr.qty}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{r.prev.qty}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{(r.curr.qty - r.prev.qty).toFixed(0)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.prev.sales)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'right' }}>{fmtMoney(r.curr.sales - r.prev.sales)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
               )}
             </div>
           )}
         </>
       )}
+      <DebugTerminal />
     </div>
   );
 }

@@ -3,6 +3,6 @@ import { clearXeroSessionCookie } from '@/lib/session';
 
 export async function GET() {
   const res = NextResponse.redirect('/xero');
-  clearXeroSessionCookie(res);
+  await clearXeroSessionCookie(res);
   return res;
 }

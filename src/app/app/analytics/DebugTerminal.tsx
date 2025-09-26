@@ -39,7 +39,7 @@ export default function DebugTerminal() {
 
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 50 }}>
-      <div style={{ margin: '0 12px 12px', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 14px rgba(0,0,0,0.12)' }}>
+      <div style={{ margin: '0 12px 12px', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', maxHeight: '40vh' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#111827', color: '#e5e7eb', padding: '8px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <strong>Live Terminal</strong>
@@ -58,7 +58,7 @@ export default function DebugTerminal() {
           </div>
         </div>
         {open && (
-          <pre style={{ margin: 0, maxHeight: 260, overflow: 'auto', background: '#0b1220', color: '#cbd5e1', fontSize: 12, padding: 12 }}>
+          <pre style={{ margin: 0, maxHeight: '35vh', overflow: 'auto', background: '#0b1220', color: '#cbd5e1', fontSize: 12, padding: 12 }}>
             {JSON.stringify(result, null, 2)}
           </pre>
         )}

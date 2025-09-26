@@ -120,12 +120,13 @@ export function LineChart({
   // Handle mouse move for tooltip
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!chartRef.current) return;
-    
+
     const rect = chartRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
-    setTooltipContent({ x, y, content: '' });
+
+    // Preserve previous tooltip content and only update position
+    setTooltipContent((prev) => (prev ? { x, y, content: prev.content } : null));
   };
   
   // Handle mouse leave
@@ -137,7 +138,8 @@ export function LineChart({
   
   // Format value with currency if provided
   const formatValueWithCurrency = (value: number) => {
-    if (formatType === 'money' || currency) {
+    // Only format as currency when explicitly requested via formatType
+    if (formatType === 'money') {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: currency || 'USD',

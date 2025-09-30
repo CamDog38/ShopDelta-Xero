@@ -500,17 +500,22 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const d = new Date(inv.date ?? Date.now());
     const mk = monthKey(d);
     const cur = monthlyMap.get(mk) || { qty: 0, sales: 0 };
-    const q = Array.isArray(inv.lineItems)
-      ? (inv.lineItems as LineItemLite[]).reduce((s, li) => {
-          const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
-          let qq = li.quantity;
-          if ((qq == null || qq === 0) && hasAmount) { inferredQtyLines++; qq = 1; }
-          return s + sign * Number(qq ?? 0);
-        }, 0)
-      : 0;
+    const itemsM = ((inv as any).lineItems || (inv as any).LineItems || []) as LineItemLite[];
+    let q = 0;
+    if (Array.isArray(itemsM)) {
+      q = itemsM.reduce((s, li) => {
+        const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
+        let qq = li.quantity;
+        if ((qq == null || qq === 0) && hasAmount) { inferredQtyLines++; qq = 1; }
+        return s + sign * Number(qq ?? 0);
+      }, 0);
+    } else if (typeof inv.total === 'number') {
+      inferredQtyLines++;
+      q += sign * 1;
+    }
     cur.qty += q;
-    const sumLines = Array.isArray(inv.lineItems)
-      ? (inv.lineItems as LineItemLite[]).reduce((s, li) => {
+    const sumLines = Array.isArray(itemsM)
+      ? itemsM.reduce((s, li) => {
           const fb = (li.unitAmount ?? 0) * (li.quantity ?? 0);
           const chosen = (li.lineAmount ?? fb) - Number(li.taxAmount ?? 0);
           return s + sign * Number(chosen || 0);
@@ -518,8 +523,8 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
       : 0;
     let chosenTotal = sumLines;
     if (typeof inv.total === 'number') {
-      if (inv.lineAmountTypes && inv.lineAmountTypes.toLowerCase() === 'inclusive' && Array.isArray(inv.lineItems)) {
-        const taxSum = inv.lineItems.reduce((s: number, li) => s + Number(li.taxAmount ?? 0), 0);
+      if (inv.lineAmountTypes && inv.lineAmountTypes.toLowerCase() === 'inclusive' && Array.isArray(itemsM)) {
+        const taxSum = itemsM.reduce((s, li) => s + Number(li.taxAmount ?? 0), 0);
         chosenTotal = sign * (Number(inv.total) - taxSum);
       } else {
         chosenTotal = sign * Number(inv.total);

@@ -196,7 +196,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const current = map.get(key) || { quantity: 0, sales: 0 };
     // Use both lowercase and PascalCase variants from the Xero SDK
     const items = ((inv as any).lineItems || (inv as any).LineItems || []) as LineItemLite[];
-    const qty = Array.isArray(items)
+    let qty = Array.isArray(items)
       ? items.reduce((s: number, li: LineItemLite) => {
           const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
           let q = li.quantity;
@@ -204,6 +204,11 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
           return s + sign * Number(q ?? 0);
         }, 0)
       : 0;
+    // Mirror product logic: when there are no line items, infer qty = 1 if invoice has an amount
+    if ((!Array.isArray(items) || items.length === 0) && (typeof inv.total === 'number')) {
+      inferredQtyLines++;
+      qty += sign * 1;
+    }
     // Pre-tax line amount: (lineAmount or unit*qty) minus taxAmount if present
     const totalLinesPretax = Array.isArray(items)
       ? items.reduce((s: number, li: LineItemLite) => {
@@ -215,8 +220,8 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     // Prefer invoice total, but adjust to pre-tax if we can infer tax: when Inclusive, subtract sum of tax amounts
     let total = totalLinesPretax;
     if (typeof inv.total === 'number') {
-      if (inv.lineAmountTypes && inv.lineAmountTypes.toLowerCase() === 'inclusive' && Array.isArray(inv.lineItems)) {
-        const taxSum = inv.lineItems.reduce((s: number, li) => s + Number(li.taxAmount ?? 0), 0);
+      if (inv.lineAmountTypes && inv.lineAmountTypes.toLowerCase() === 'inclusive' && Array.isArray(items)) {
+        const taxSum = items.reduce((s: number, li) => s + Number(li.taxAmount ?? 0), 0);
         total = sign * (Number(inv.total) - taxSum);
       } else {
         // assume invoice total already exclusive or no tax; still apply sign

@@ -637,9 +637,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                           prevQty: r.aQty, 
                           currSales: r.bSales, 
                           prevSales: r.aSales 
-                        }))
-                        // Filter out rows with no data
-                        .filter(row => row.currQty > 0 || row.prevQty > 0 || row.currSales > 0 || row.prevSales > 0);
+                        }));
                       
                       // If no rows after filtering, show a message
                       if (rows.length === 0) {
@@ -804,9 +802,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                               currSales: c.sales, 
                               prevSales: p.sales 
                             };
-                          })
-                          // Filter out rows with no meaningful data
-                          .filter(row => row.currQty > 0 || row.prevQty > 0 || row.currSales > 0 || row.prevSales > 0);
+                          });
                         
                         // If no rows after filtering, show a message
                         if (rows.length === 0) {

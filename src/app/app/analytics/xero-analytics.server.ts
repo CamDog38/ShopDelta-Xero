@@ -4,11 +4,13 @@ import { getXeroClient } from '@/lib/xero';
 export type Granularity = 'day' | 'week' | 'month';
 
 export type Preset = 'last30' | 'thisMonth' | 'ytd' | 'custom';
+export type Basis = 'accrual' | 'cash';
 export type XeroAnalyticsFilters = {
   preset?: Preset;
   start?: string; // YYYY-MM-DD UTC
   end?: string;   // YYYY-MM-DD UTC
   granularity?: Granularity;
+  basis?: Basis;
 };
 
 // Lightweight internal types limited to fields we actually use from the Xero SDK
@@ -47,11 +49,14 @@ type XeroClientLike = {
   accountingApi: {
     getInvoices: (tenantId: string) => Promise<{ body?: { invoices?: unknown[] } }>;
     getItems: (tenantId: string) => Promise<{ body?: { items?: unknown[] } }>;
+    // Optional methods depending on SDK version
+    getPayments?: (tenantId: string) => Promise<{ body?: { payments?: unknown[] } }>;
+    getBankTransactions?: (tenantId: string) => Promise<{ body?: { bankTransactions?: unknown[] } }>;
   };
 };
 
 export type XeroAnalyticsResult = {
-  filters: { preset: Preset; start: string; end: string; granularity: Granularity };
+  filters: { preset: Preset; start: string; end: string; granularity: Granularity; basis: Basis };
   totals: { qty: number; sales: number; currency?: string };
   series: Array<{ key: string; label: string; quantity: number; sales: number }>;
   recentInvoices: Array<{ id: string; number?: string; status?: string; total?: number; currency?: string; date?: string }>;
@@ -155,10 +160,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }
 
   const { start, end, granularity, preset } = normalizeRange(input);
+  const basis: Basis = (input.basis as Basis) || 'accrual';
   console.log('📅 [DATE RANGE]', { preset, start: start.toISOString(), end: end.toISOString(), granularity });
 
-  // Fetch invoices within a broad range. Xero API doesn't support complex filters in all SDK versions,
-  // so we fetch a reasonable number and filter in memory for the example.
+  // Fetch invoices within a broad range
   console.log('📋 [FETCHING INVOICES]');
   const invRes = await requestWithRetry(() => xero.accountingApi.getInvoices(session.tenantId));
   const fetchedAll = ((invRes.body?.invoices ?? []) as unknown as InvoiceLite[]);
@@ -186,7 +191,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   let creditQty = 0;
   let creditSales = 0;
 
-  // Aggregate by bucket
+  // Aggregate by bucket (accrual basis)
   const map = new Map<string, { quantity: number; sales: number }>();
   for (const inv of invoices) {
     const sign = (inv.type || '').toUpperCase() === 'ACCRECCREDIT' ? -1 : 1;
@@ -236,13 +241,66 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
       creditSales += total; // total already carries sign
     }
   }
+  // Cash-basis aggregation
+  const cashMap = new Map<string, { quantity: number; sales: number }>();
+  if (basis === 'cash') {
+    // Payments linked to ACCREC invoices
+    try {
+      if (typeof xero.accountingApi.getPayments === 'function') {
+        console.log('💵 [FETCHING PAYMENTS]');
+        const payRes = await requestWithRetry(() => xero.accountingApi.getPayments!(session.tenantId));
+        const payments = (payRes?.body?.payments ?? []) as any[];
+        for (const p of payments) {
+          const dtRaw = p.date || p.Date; const dt = dtRaw ? new Date(dtRaw) : null;
+          if (!dt || dt < start || dt > end) continue;
+          const invType = (p?.invoice?.type || p?.Invoice?.Type || '').toUpperCase();
+          if (invType && invType !== 'ACCREC' && invType !== 'ACCRECCREDIT') continue;
+          const amount = Number(p.amount ?? p.Amount ?? 0);
+          const sign = invType === 'ACCRECCREDIT' ? -1 : 1; // refund against credit note treated negative
+          const key = bucketKey(dt, granularity);
+          const cur = cashMap.get(key) || { quantity: 0, sales: 0 };
+          cur.quantity += 0; // payments do not change qty
+          cur.sales += sign * amount;
+          cashMap.set(key, cur);
+        }
+      }
+    } catch (e) {
+      console.warn('Payments fetch failed/skipped', e);
+    }
+    // Receive-money bank transactions not linked to invoices
+    try {
+      if (typeof xero.accountingApi.getBankTransactions === 'function') {
+        console.log('🏦 [FETCHING BANK TRANSACTIONS]');
+        const btRes = await requestWithRetry(() => xero.accountingApi.getBankTransactions!(session.tenantId));
+        const bankTxns = (btRes?.body?.bankTransactions ?? []) as any[];
+        for (const bt of bankTxns) {
+          const dtRaw = bt.date || bt.Date; const dt = dtRaw ? new Date(dtRaw) : null;
+          if (!dt || dt < start || dt > end) continue;
+          const type = (bt.type || bt.Type || '').toUpperCase();
+          const isReceive = type.includes('RECEIVE');
+          if (!isReceive) continue; // cash in only
+          // Skip if directly linked to an invoice
+          const hasInvoiceLink = !!(bt?.invoice?.invoiceID || bt?.Invoice?.InvoiceID);
+          if (hasInvoiceLink) continue;
+          const amount = Number(bt.total ?? bt.Total ?? bt.amount ?? bt.Amount ?? 0);
+          const key = bucketKey(dt, granularity);
+          const cur = cashMap.get(key) || { quantity: 0, sales: 0 };
+          cur.sales += amount;
+          cashMap.set(key, cur);
+        }
+      }
+    } catch (e) {
+      console.warn('Bank transactions fetch failed/skipped', e);
+    }
+  }
 
-  // Build series sorted by key
-  const keys = Array.from(map.keys()).sort();
-  const series = keys.map((k) => ({ key: k, label: k, quantity: map.get(k)!.quantity, sales: map.get(k)!.sales }));
+  // Build series sorted by key using chosen basis
+  const mapToUse = basis === 'cash' ? cashMap : map;
+  const keys = Array.from(mapToUse.keys()).sort();
+  const series = keys.map((k) => ({ key: k, label: k, quantity: mapToUse.get(k)!.quantity, sales: mapToUse.get(k)!.sales }));
 
   const totals = series.reduce((acc, s) => ({ qty: acc.qty + s.quantity, sales: acc.sales + s.sales }), { qty: 0, sales: 0 });
-  console.log('📊 [PERIOD AGGREGATION DONE]', { periods: keys.length, totals });
+  console.log(`📊 [PERIOD AGGREGATION DONE ${basis.toUpperCase()}]`, { periods: keys.length, totals });
 
   // Recent invoices (all in range, newest first)
   const recentInvoices = invoices
@@ -599,7 +657,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }, {});
 
   return {
-    filters: { preset, start: fmtYMD(start), end: fmtYMD(end), granularity },
+    filters: { preset, start: fmtYMD(start), end: fmtYMD(end), granularity, basis },
     totals: { qty: totals.qty, sales: totals.sales, currency },
     series,
     recentInvoices,

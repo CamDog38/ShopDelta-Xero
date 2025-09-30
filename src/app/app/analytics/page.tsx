@@ -27,12 +27,14 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   const compareScope = (typeof sp.compareScope === 'string' ? sp.compareScope : 'total') as 'total' | 'product';
   const compareA = (typeof sp.compareA === 'string' ? sp.compareA : ''); // YYYY-MM
   const compareB = (typeof sp.compareB === 'string' ? sp.compareB : ''); // YYYY-MM
+  const basis = (typeof sp.basis === 'string' ? sp.basis : 'accrual') as 'accrual' | 'cash';
 
   const filters: XeroAnalyticsFilters = {
     preset: (typeof sp.preset === 'string' ? sp.preset : 'last30') as any,
     start: typeof sp.start === 'string' ? sp.start : undefined,
     end: typeof sp.end === 'string' ? sp.end : undefined,
     granularity: (typeof sp.granularity === 'string' ? (sp.granularity as any) : 'day'),
+    basis,
   };
 
   let result: Awaited<ReturnType<typeof getXeroAnalytics>> | null = null;
@@ -126,6 +128,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               <input type="hidden" name="metric" value={metric} />
               <input type="hidden" name="chart" value={chart} />
               <input type="hidden" name="chartScope" value={chartScope} />
+              <input type="hidden" name="basis" value={basis} />
             </form>
           </div>
 
@@ -136,6 +139,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               <a href={`?${new URLSearchParams({ ...sp as any, view: 'table' }).toString()}`} className={view === 'table' ? '' : 'analytics-muted'}>📋 Data Table</a>
               <a href={`?${new URLSearchParams({ ...sp as any, view: 'summary' }).toString()}`} className={view === 'summary' ? '' : 'analytics-muted'}>📑 Summary</a>
               <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare' }).toString()}`} className={view === 'compare' ? '' : 'analytics-muted'}>🔄 Compare</a>
+            </div>
+          </div>
+
+          {/* Basis toggle */}
+          <div className={`${styles.card} analytics-card`} style={{ padding: 8 }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#6b7280' }}>Accounting Basis</div>
+              <div className="analytics-segmented">
+                <a href={`?${new URLSearchParams({ ...sp as any, basis: 'accrual' }).toString()}`} className={basis === 'accrual' ? '' : 'analytics-muted'}>Accrual</a>
+                <a href={`?${new URLSearchParams({ ...sp as any, basis: 'cash' }).toString()}`} className={basis === 'cash' ? '' : 'analytics-muted'}>Cash</a>
+              </div>
             </div>
           </div>
 

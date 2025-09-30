@@ -455,23 +455,51 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const mk = monthKey(new Date(inv.date ?? Date.now()));
     let per = monthlyProductMap.get(mk);
     if (!per) { per = new Map(); monthlyProductMap.set(mk, per); }
-    if (!Array.isArray(inv.lineItems)) continue;
-    for (const li of inv.lineItems as LineItemLite[]) {
-      const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
-      let pid = rawCode || String(li.description || 'unknown');
-      let title = (rawCode && itemsIndex.get(rawCode)?.name) || String(li.description || li.itemCode || 'Item');
-      if (!rawCode && li.description) {
-        const norm = normalizeText(li.description);
-        const hit = norm ? itemsNameIndex.get(norm) : undefined;
-        if (hit) { title = hit.name || title; pid = String(hit.code || title); }
+    const lineItemsMP = ((inv as any).lineItems || (inv as any).LineItems || []) as LineItemLite[];
+    if (Array.isArray(lineItemsMP) && lineItemsMP.length > 0) {
+      for (const li of lineItemsMP) {
+        const rawCode = (li.itemCode ? String(li.itemCode) : '').toUpperCase();
+        let pid = rawCode || String(li.description || 'unknown');
+        let title = (rawCode && itemsIndex.get(rawCode)?.name) || String(li.description || li.itemCode || 'Item');
+        if (!rawCode && li.description) {
+          const norm = normalizeText(li.description);
+          const hit = norm ? itemsNameIndex.get(norm) : undefined;
+          if (hit) { title = hit.name || title; pid = String(hit.code || title); }
+        }
+        const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
+        let q = li.quantity; if ((q == null || q === 0) && hasAmount) q = 1;
+        const fb = (li.unitAmount ?? 0) * (li.quantity ?? 0);
+        const amt = (li.lineAmount ?? fb) - Number(li.taxAmount ?? 0);
+        const agg = per.get(pid) || { title, qty: 0, sales: 0 };
+        agg.qty += sign * Number(q ?? 0);
+        agg.sales += sign * Number(amt || 0);
+        per.set(pid, agg);
       }
-      const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
-      let q = li.quantity; if ((q == null || q === 0) && hasAmount) q = 1;
-      const fb = (li.unitAmount ?? 0) * (li.quantity ?? 0);
-      const amt = (li.lineAmount ?? fb) - Number(li.taxAmount ?? 0);
+    } else {
+      // Fallback: treat invoice as a single product based on reference/number when no line items
+      const reference = String((inv as any).reference || '');
+      const normalizedRef = normalizeText(reference);
+      let pid = reference || String(inv.invoiceNumber || inv.invoiceID || 'invoice');
+      let title = reference || 'Invoice ' + (inv.invoiceNumber || inv.invoiceID || '');
+      if (reference) {
+        const upperRef = reference.toUpperCase();
+        const itemInfo = itemsIndex.get(upperRef);
+        if (itemInfo) {
+          title = itemInfo.name || title;
+          pid = upperRef;
+        } else if (normalizedRef) {
+          const nameHit = itemsNameIndex.get(normalizedRef);
+          if (nameHit) {
+            title = nameHit.name || title;
+            pid = String(nameHit.code || title);
+          }
+        }
+      }
+      const liQty = sign * 1;
+      const liSales = sign * (Number(inv.total || 0) - Number((inv as any).totalTax || 0));
       const agg = per.get(pid) || { title, qty: 0, sales: 0 };
-      agg.qty += sign * Number(q ?? 0);
-      agg.sales += sign * Number(amt || 0);
+      agg.qty += liQty;
+      agg.sales += liSales;
       per.set(pid, agg);
     }
   }

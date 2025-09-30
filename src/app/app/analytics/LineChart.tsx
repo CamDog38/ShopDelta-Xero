@@ -406,7 +406,7 @@ export function LineChart({
                       top: 0,
                       left: 0,
                       pointerEvents: 'auto',
-                      opacity: isHighlighted ? 1 : 0.3,
+                      opacity: isHighlighted ? 1 : 0.7,
                       transition: 'opacity 0.2s ease'
                     }}
                   >
@@ -415,7 +415,7 @@ export function LineChart({
                       d={pathD}
                       fill="none"
                       stroke={series.color}
-                      strokeWidth={isHighlighted ? 0.08 : 0.06}
+                      strokeWidth={isHighlighted ? 0.30 : 0.22}
                       vectorEffect="non-scaling-stroke"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -465,13 +465,13 @@ export function LineChart({
                         position: 'absolute',
                         left: `${point.x}%`,
                         top: `${point.y}%`,
-                        width: '6px',
-                        height: '6px',
+                        width: '8px',
+                        height: '8px',
                         borderRadius: '50%',
                         backgroundColor: series.color,
-                        border: '1px solid #ffffff',
+                        border: '2px solid #ffffff',
                         transform: 'translate(-50%, -50%)',
-                        opacity: isHighlighted ? 1 : 0.3,
+                        opacity: isHighlighted ? 1 : 0.7,
                         transition: 'all 0.2s ease',
                         cursor: 'pointer',
                         zIndex: hoveredPoint?.seriesId === series.id && hoveredPoint?.pointIndex === i ? 10 : 1,

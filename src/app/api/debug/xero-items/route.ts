@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getXeroSession } from '@/lib/session';
 import { getXeroClient } from '@/lib/xero';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await getXeroSession();
     if (!session) {
@@ -22,13 +22,14 @@ export async function GET() {
     }>;
     const durationMs = Date.now() - startedAt;
 
-    return NextResponse.json({
-      ok: true,
-      tenantId: session.tenantId,
-      count: items.length,
-      sample: items.slice(0, 5),
-      durationMs,
-    });
+    const u = new URL(req.url);
+    const sample = u.searchParams.get('sample');
+    if (sample) {
+      const n = Math.max(0, Math.min(items.length, Number(sample) || 5));
+      return NextResponse.json({ ok: true, tenantId: session.tenantId, count: items.length, sample: items.slice(0, n), durationMs });
+    }
+    // Default: full payload
+    return NextResponse.json({ ok: true, tenantId: session.tenantId, count: items.length, items, durationMs });
   } catch (e: any) {
     const status = e?.response?.statusCode || 500;
     return NextResponse.json({

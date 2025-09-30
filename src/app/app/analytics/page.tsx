@@ -289,6 +289,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               <h3 className={styles.sectionTitle}>Table View</h3>
               {chartScope === 'product' ? (
                 <Suspense fallback={<div>Loading product data table...</div>}>
+                  {/* Product header chips */}
+                  <div className="analytics-chart-scroll" style={{ marginBottom: 12 }}>
+                    <div className="analytics-legend-chips">
+                      {(result?.productLegend || []).map(p => (
+                        <div key={p.id} className="analytics-legend-chip">
+                          <span className="analytics-legend-swatch" style={{ background: '#0ea5e9' }} />
+                          <span>{p.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <EnhancedTable
                     data={(result?.seriesProduct || []).map(row => {
                       const rowData: Record<string, any> = { timePeriod: row.label };

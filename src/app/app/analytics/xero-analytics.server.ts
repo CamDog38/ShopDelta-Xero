@@ -509,6 +509,11 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
         if ((qq == null || qq === 0) && hasAmount) { inferredQtyLines++; qq = 1; }
         return s + sign * Number(qq ?? 0);
       }, 0);
+      // If items exist but the array is empty and invoice has amount, infer qty = 1
+      if (itemsM.length === 0 && typeof inv.total === 'number') {
+        inferredQtyLines++;
+        q += sign * 1;
+      }
     } else if (typeof inv.total === 'number') {
       inferredQtyLines++;
       q += sign * 1;

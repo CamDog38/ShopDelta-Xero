@@ -543,7 +543,9 @@ export function LineChart({
             />
           )}
         </div>
+        {/* Close line-chart-frame */}
       </div>
+      {/* Close line-chart-container */}
     </div>
   );
 }

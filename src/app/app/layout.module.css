@@ -3,7 +3,7 @@
   grid-template-rows: auto 1fr;
   grid-template-columns: 240px 1fr;
   min-height: 100vh;
-  background: #0c0c0c; /* page bg (dark) */
+  background: #ffffff; /* page bg (light) */
 }
 
 .header {
@@ -12,15 +12,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  background: #101214;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  background: #0b5bd3; /* blue header */
   position: sticky;
   top: 0;
   z-index: 5;
 }
 
 .brand {
-  color: #e6f6f9;
+  color: #ffffff;
   font-size: 18px;
   font-weight: 600;
   margin: 0;
@@ -31,7 +31,7 @@
   gap: 12px;
   align-items: center;
   font-size: 13px;
-  color: #cfe9ee;
+  color: #eaf2ff;
 }
 
 .pill {
@@ -40,25 +40,25 @@
   gap: 8px;
   padding: 6px 10px;
   border-radius: 999px;
-  background: #0b3b45;
-  color: #d7f3f7;
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.18);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.25);
 }
 
-.linkLight { color: #9fe2ef; text-decoration: none; }
+.linkLight { color: #ffffff; text-decoration: none; }
 .linkLight:hover { text-decoration: underline; }
 
 .sidebar {
   grid-row: 2;
   grid-column: 1;
-  background: #0b3b45;
-  color: #fff;
+  background: #0e6fff; /* blue menu */
+  color: #ffffff;
   padding: 20px 16px;
 }
 
 .nav ul { list-style: none; padding: 0; margin: 0; }
 .nav li { margin: 8px 0; }
-.nav a { color: #cfe9ee; text-decoration: none; }
+.nav a { color: #eaf2ff; text-decoration: none; }
 .nav a:hover { color: #ffffff; text-decoration: underline; }
 
 .content {

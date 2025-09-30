@@ -85,29 +85,30 @@ export function ProductTable({ data, currency }: ProductTableProps) {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
             padding: '8px 12px',
-            border: '1px solid #e5e7eb',
+            border: '1px solid #d1d5db',
             borderRadius: '4px',
             width: '100%',
             maxWidth: '300px',
-            backgroundColor: '#1e1e1e',
-            color: '#e5e7eb'
+            backgroundColor: '#ffffff',
+            color: '#111827'
           }}
         />
-        <div style={{ marginTop: '8px', fontSize: '14px', color: '#a0aec0' }}>
+        <div style={{ marginTop: '8px', fontSize: '14px', color: '#6b7280' }}>
           {filteredAndSortedData.length} products • {filteredAndSortedData.reduce((sum, p) => sum + p.qty, 0)} total quantity
         </div>
       </div>
 
       {/* Accordion table */}
-      <div className="product-table-accordion" style={{ border: '1px solid #2d3748', borderRadius: '6px', overflow: 'hidden' }}>
+      <div className="product-table-accordion" style={{ border: '1px solid #e5e7eb', borderRadius: '6px', overflow: 'hidden' }}>
         {/* Table header */}
         <div className="product-table-header" style={{ 
           display: 'grid', 
           gridTemplateColumns: '1fr 100px 150px',
           padding: '12px 16px',
-          backgroundColor: '#2d3748',
+          backgroundColor: '#f9fafb',
+          color: '#111827',
           fontWeight: 'bold',
-          borderBottom: '1px solid #4a5568'
+          borderBottom: '1px solid #e5e7eb'
         }}>
           <div onClick={() => handleSort('title')} style={{ cursor: 'pointer' }}>
             Product {getSortIndicator('title')}
@@ -122,7 +123,7 @@ export function ProductTable({ data, currency }: ProductTableProps) {
 
         {/* Table body */}
         {filteredAndSortedData.length === 0 ? (
-          <div style={{ padding: '16px', textAlign: 'center', color: '#a0aec0' }}>
+          <div style={{ padding: '16px', textAlign: 'center', color: '#6b7280' }}>
             No products found
           </div>
         ) : (
@@ -137,8 +138,8 @@ export function ProductTable({ data, currency }: ProductTableProps) {
                   gridTemplateColumns: '1fr 100px 150px',
                   padding: '12px 16px',
                   cursor: 'pointer',
-                  borderBottom: '1px solid #4a5568',
-                  backgroundColor: expandedRows[product.id] ? '#1a202c' : 'transparent',
+                  borderBottom: '1px solid #e5e7eb',
+                  backgroundColor: expandedRows[product.id] ? '#f9fafb' : 'transparent',
                   transition: 'background-color 0.2s'
                 }}
               >
@@ -156,8 +157,8 @@ export function ProductTable({ data, currency }: ProductTableProps) {
               {expandedRows[product.id] && (
                 <div className="product-details" style={{ 
                   padding: '16px', 
-                  backgroundColor: '#1a202c',
-                  borderBottom: '1px solid #4a5568'
+                  backgroundColor: '#f9fafb',
+                  borderBottom: '1px solid #e5e7eb'
                 }}>
                   <div style={{ marginBottom: '8px' }}>
                     <strong>Product ID:</strong> {product.id}

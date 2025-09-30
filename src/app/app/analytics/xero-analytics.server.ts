@@ -194,8 +194,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     const dt = new Date(inv.date ?? Date.now());
     const key = bucketKey(dt, granularity);
     const current = map.get(key) || { quantity: 0, sales: 0 };
-    const qty = Array.isArray(inv.lineItems)
-      ? inv.lineItems.reduce((s: number, li: LineItemLite) => {
+    // Use both lowercase and PascalCase variants from the Xero SDK
+    const items = ((inv as any).lineItems || (inv as any).LineItems || []) as LineItemLite[];
+    const qty = Array.isArray(items)
+      ? items.reduce((s: number, li: LineItemLite) => {
           const hasAmount = typeof li.lineAmount === 'number' || typeof li.unitAmount === 'number';
           let q = li.quantity;
           if ((q == null || q === 0) && hasAmount) { inferredQtyLines++; q = 1; }
@@ -203,8 +205,8 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
         }, 0)
       : 0;
     // Pre-tax line amount: (lineAmount or unit*qty) minus taxAmount if present
-    const totalLinesPretax = Array.isArray(inv.lineItems)
-      ? inv.lineItems.reduce((s: number, li: LineItemLite) => {
+    const totalLinesPretax = Array.isArray(items)
+      ? items.reduce((s: number, li: LineItemLite) => {
           const gross = li.lineAmount ?? ((li.unitAmount ?? 0) * (li.quantity ?? 0));
           const pretax = Number((gross ?? 0)) - Number(li.taxAmount ?? 0);
           return s + sign * pretax;

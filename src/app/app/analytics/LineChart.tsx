@@ -415,7 +415,7 @@ export function LineChart({
                       d={pathD}
                       fill="none"
                       stroke={series.color}
-                      strokeWidth={isHighlighted ? 0.30 : 0.22}
+                      strokeWidth={isHighlighted ? 0.50 : 0.40}
                       vectorEffect="non-scaling-stroke"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -465,8 +465,8 @@ export function LineChart({
                         position: 'absolute',
                         left: `${point.x}%`,
                         top: `${point.y}%`,
-                        width: '8px',
-                        height: '8px',
+                        width: '10px',
+                        height: '10px',
                         borderRadius: '50%',
                         backgroundColor: series.color,
                         border: '2px solid #ffffff',

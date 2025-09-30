@@ -405,18 +405,55 @@ export function LineChart({
                       position: 'absolute',
                       top: 0,
                       left: 0,
-                      pointerEvents: 'none',
+                      pointerEvents: 'auto',
                       opacity: isHighlighted ? 1 : 0.3,
                       transition: 'opacity 0.2s ease'
                     }}
                   >
+                    {/* Visible line */}
                     <path
                       d={pathD}
                       fill="none"
                       stroke={series.color}
-                      strokeWidth={isHighlighted ? 0.4 : 0.3}
+                      strokeWidth={isHighlighted ? 0.08 : 0.06}
+                      vectorEffect="non-scaling-stroke"
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                    />
+                    {/* Invisible hover hit area to improve hover like bar chart */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke={series.color}
+                      strokeWidth={1.2}
+                      vectorEffect="non-scaling-stroke"
+                      opacity={0}
+                      style={{ pointerEvents: 'stroke' }}
+                      onMouseEnter={() => setHoveredProduct(series.id)}
+                      onMouseLeave={() => {
+                        setHoveredProduct(null);
+                        setHoveredPoint(null);
+                        setTooltipContent(null);
+                      }}
+                      onMouseMove={(e) => {
+                        if (!chartRef.current) return;
+                        const rect = chartRef.current.getBoundingClientRect();
+                        const relX = ((e.clientX - rect.left) / rect.width) * 100; // 0..100
+                        // Find nearest point by X
+                        let nearestIndex = 0;
+                        let nearestDx = Infinity;
+                        points.forEach((pt, idx) => {
+                          const dx = Math.abs(pt.x - relX);
+                          if (dx < nearestDx) { nearestDx = dx; nearestIndex = idx; }
+                        });
+                        const pt = points[nearestIndex];
+                        setHoveredPoint({ seriesId: series.id, pointIndex: nearestIndex });
+                        setTooltipContent({
+                          x: (pt.x / 100) * rect.width,
+                          y: (pt.y / 100) * rect.height,
+                          content: formatTooltipContent(series, pt.value, pt.label)
+                        });
+                      }}
                     />
                   </svg>
                   
@@ -428,11 +465,11 @@ export function LineChart({
                         position: 'absolute',
                         left: `${point.x}%`,
                         top: `${point.y}%`,
-                        width: '14px',
-                        height: '14px',
+                        width: '6px',
+                        height: '6px',
                         borderRadius: '50%',
                         backgroundColor: series.color,
-                        border: '2px solid #ffffff',
+                        border: '1px solid #ffffff',
                         transform: 'translate(-50%, -50%)',
                         opacity: isHighlighted ? 1 : 0.3,
                         transition: 'all 0.2s ease',

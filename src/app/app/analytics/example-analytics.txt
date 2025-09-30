@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Page, DataTable, BlockStack, Text, Link, Button, InlineStack, Spinner } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import analyticsStylesUrl from "./styles/analytics.css?url";
-import type { loader as analyticsLoader } from "./app.analytics.server";
+import type { loader as analyticsLoader } from "./example-analytics.server";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: analyticsStylesUrl },

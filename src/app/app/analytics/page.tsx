@@ -193,15 +193,15 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                   <div className="analytics-chart-scroll">
                     <Suspense fallback={<div>Loading line chart...</div>}>
                       <LineChart
-                        data={[{
-                          key: 'aggregate',
-                          label: 'Aggregate',
-                          products: series.map(s => ({
-                            id: s.key,
-                            title: s.label,
-                            value: metric === 'sales' ? s.sales : s.quantity
-                          }))
-                        }]}
+                        data={series.map(s => ({
+                          key: s.key,
+                          label: s.label,
+                          products: [{
+                            id: 'total',
+                            title: 'Total',
+                            value: (metric === 'sales' ? s.sales : s.quantity) ?? 0
+                          }]
+                        }))}
                         title={`${metric === 'sales' ? 'Sales' : 'Quantity'} Over Time`}
                         yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
                         xAxisLabel="Time Period"
@@ -226,7 +226,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                           products: Object.entries(series.per).map(([id, data]) => ({
                             id,
                             title: data.title,
-                            value: metric === 'sales' ? data.sales : data.qty
+                            value: (metric === 'sales' ? data.sales : (data as any).qty) ?? 0
                           }))
                         }))}
                         title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product`}
@@ -244,7 +244,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               {/* By product chart: line chart with interactive legend */}
               {chartScope === 'product' && chart === 'line' && (
                 ((result?.seriesProduct?.length ?? 0) === 0) ? <p>No data in range.</p> : (
-                  <div className="analytics-chart-scroll">
+                  <div>
                     <Suspense fallback={<div>Loading line chart...</div>}>
                       <LineChart
                         data={(result?.seriesProduct || []).map(series => ({

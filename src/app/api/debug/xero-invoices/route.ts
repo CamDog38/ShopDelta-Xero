@@ -58,7 +58,13 @@ export async function GET(request: Request) {
     };
 
     const durationMs = Date.now() - startedAt;
-    return NextResponse.json({ ok: true, tenantId: session.tenantId, durationMs, stats, sample: invoices.slice(0, 3) });
+    const sample = searchParams.get('sample');
+    if (sample) {
+      const n = Math.max(0, Math.min(invoices.length, Number(sample) || 3));
+      return NextResponse.json({ ok: true, tenantId: session.tenantId, durationMs, stats, sample: invoices.slice(0, n) });
+    }
+    // Default: full payload
+    return NextResponse.json({ ok: true, tenantId: session.tenantId, durationMs, stats, invoices });
   } catch (e: any) {
     const status = e?.response?.statusCode || 500;
     return NextResponse.json({ ok: false, error: e?.message, response: e?.response, body: e?.response?.body }, { status });

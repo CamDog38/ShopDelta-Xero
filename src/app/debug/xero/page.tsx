@@ -88,7 +88,7 @@ export default function XeroDebugPage() {
       )}
 
       <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', padding: 12, maxHeight: '70vh', overflow: 'auto' }}>
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>{pretty || 'No data yet. Click Fetch.'}</pre>
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>{pretty || 'No data yet. Click Fetch.'}</pre>
       </div>
     </div>
   );

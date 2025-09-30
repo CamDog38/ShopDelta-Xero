@@ -67,7 +67,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
   return (
     <div className={styles.container}>
-      <h1>Analytics</h1>
+      <h1 style={{ color: '#111827', fontSize: '32px', fontWeight: '700', marginBottom: '24px' }}>Analytics</h1>
       {!connected ? (
         <div className={styles.card}>
           <p>Not connected to Xero. Connect to run analytics.</p>
@@ -91,6 +91,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
         <>
           {/* Filters */}
           <div className={`${styles.card} analytics-card`}>
+            <h3 style={{ color: '#111827', fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Date Range & Filters</h3>
             <form id="filters-form" method="get" className="analytics-form-row">
               <div className="analytics-select">
                 <label className="text-12">Time Period</label>
@@ -141,19 +142,31 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
           {/* Charts */}
           {view === 'chart' && (
             <div className={`${styles.card} analytics-card`}>
-              <div className="analytics-header">
-                <div className="analytics-segmented">
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', metric: 'qty' }).toString()}`} className={metric === 'qty' ? '' : 'analytics-muted'}>📦 Quantity</a>
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', metric: 'sales' }).toString()}`} className={metric === 'sales' ? '' : 'analytics-muted'}>💰 Sales</a>
-                  <span className="spacer-16" />
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chartScope: 'aggregate' }).toString()}`} className={chartScope === 'aggregate' ? '' : 'analytics-muted'}>📊 Total</a>
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chartScope: 'product' }).toString()}`} className={chartScope === 'product' ? '' : 'analytics-muted'}>🏷️ By Product</a>
-                  <span className="spacer-16" />
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chart: 'bar' }).toString()}`} className={chart === 'bar' ? '' : 'analytics-muted'}>📊 Bar</a>
-                  <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chart: 'line' }).toString()}`} className={chart === 'line' ? '' : 'analytics-muted'}>📈 Line</a>
+              <h3 style={{ color: '#111827', fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>📊 {metric === 'qty' ? 'Quantity' : 'Sales'} Analytics</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#6b7280', marginBottom: '8px' }}>Metric</div>
+                  <div className="analytics-segmented">
+                    <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', metric: 'qty' }).toString()}`} className={metric === 'qty' ? '' : 'analytics-muted'}>📦 Quantity</a>
+                    <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', metric: 'sales' }).toString()}`} className={metric === 'sales' ? '' : 'analytics-muted'}>💰 Sales</a>
+                  </div>
                 </div>
-                <div className="legend-label">{result?.filters.start} to {result?.filters.end}</div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#6b7280', marginBottom: '8px' }}>View</div>
+                  <div className="analytics-segmented">
+                    <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chartScope: 'aggregate' }).toString()}`} className={chartScope === 'aggregate' ? '' : 'analytics-muted'}>📊 Total</a>
+                    <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chartScope: 'product' }).toString()}`} className={chartScope === 'product' ? '' : 'analytics-muted'}>🏷️ By Product</a>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#6b7280', marginBottom: '8px' }}>Chart Type</div>
+                  <div className="analytics-segmented">
+                    <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chart: 'bar' }).toString()}`} className={chart === 'bar' ? '' : 'analytics-muted'}>📊 Bar</a>
+                    <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart', chart: 'line' }).toString()}`} className={chart === 'line' ? '' : 'analytics-muted'}>📈 Line</a>
+                  </div>
+                </div>
               </div>
+              <div className="legend-label" style={{ marginBottom: '8px' }}>{result?.filters.start} to {result?.filters.end}</div>
 
               <div className="legend-label" style={{ marginBottom: 8 }}>
                 Note: values are pre-tax. Credit notes are included as negatives.

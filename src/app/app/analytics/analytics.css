@@ -12,6 +12,31 @@
     flex-direction: column;
     gap: 4px;
   }
+
+  .analytics-select label {
+    font-weight: 500;
+    color: #374151;
+    font-size: 13px;
+  }
+
+  .analytics-select select,
+  .analytics-select input[type="date"] {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background-color: #ffffff;
+    color: #111827;
+    font-size: 14px;
+    min-width: 120px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .analytics-select select:focus,
+  .analytics-select input[type="date"]:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
   
   .analytics-apply {
     align-self: flex-end;
@@ -32,11 +57,44 @@
     margin-bottom: 8px;
   }
   
-  /* Segmented control area, uses Polaris buttons; we just space them */
+  /* Segmented control area - modern button style */
   .analytics-segmented {
     display: inline-flex;
-    gap: 8px;
+    gap: 4px;
     align-items: center;
+    background: #f3f4f6;
+    border-radius: 8px;
+    padding: 4px;
+  }
+
+  .analytics-segmented a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    color: #6b7280;
+    background: transparent;
+  }
+
+  .analytics-segmented a:not(.analytics-muted) {
+    background: #ffffff;
+    color: #111827;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .analytics-segmented a:hover {
+    color: #374151;
+    background: #f9fafb;
+  }
+
+  .analytics-segmented a:not(.analytics-muted):hover {
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
   
   /* Chart container */
@@ -77,7 +135,7 @@
   }
   
   .analytics-muted {
-    opacity: 0.45;
+    opacity: 1;
   }
   
   /* Utilities */

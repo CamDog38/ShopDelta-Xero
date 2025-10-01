@@ -7,6 +7,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
+    const singleId = searchParams.get('id');
+    const raw = searchParams.get('raw');
 
     const session = await getXeroSession();
     if (!session) return NextResponse.json({ ok: false, reason: 'No session' }, { status: 401 });
@@ -17,11 +19,23 @@ export async function GET(request: Request) {
     } catch {}
 
     const startedAt = Date.now();
-    const res = await xero.accountingApi.getInvoices(session.tenantId);
-    const raw = res?.body?.invoices ?? [];
+    let baseInvoices: any[] = [];
+    if (singleId) {
+      const one = await xero.accountingApi.getInvoice(session.tenantId, singleId);
+      if (raw === '1' || raw === 'true') {
+        return NextResponse.json(one?.body ?? { ok: false }, { status: 200 });
+      }
+      baseInvoices = (one?.body?.invoices ?? one?.body?.Invoices ?? []).map((inv: any) => inv);
+    } else {
+      const res = await xero.accountingApi.getInvoices(session.tenantId);
+      if (raw === '1' || raw === 'true') {
+        return NextResponse.json(res?.body ?? { ok: false }, { status: 200 });
+      }
+      baseInvoices = (res?.body?.invoices ?? res?.body?.Invoices ?? []).map((inv: any) => inv);
+    }
 
     // Light in-memory filtering and projection for debugging
-    const invoices = raw
+    const invoices = baseInvoices
       .map((inv: any) => ({
         invoiceID: inv.invoiceID || inv.InvoiceID,
         invoiceNumber: inv.invoiceNumber || inv.InvoiceNumber,
@@ -30,15 +44,20 @@ export async function GET(request: Request) {
         type: inv.type || inv.Type,
         total: Number(inv.total ?? inv.Total ?? 0),
         currency: inv.currencyCode || inv.CurrencyCode,
-        lineItems: Array.isArray(inv.lineItems)
-          ? inv.lineItems.map((li: any) => ({
-              itemCode: li.itemCode || li.ItemCode,
-              description: li.description || li.Description,
-              quantity: Number(li.quantity ?? li.Quantity ?? 0),
-              unitAmount: Number(li.unitAmount ?? li.UnitAmount ?? 0),
-              lineAmount: Number(li.lineAmount ?? li.LineAmount ?? 0),
-            }))
-          : [],
+        lineItems: (() => {
+          const lines = (inv.lineItems ?? inv.LineItems) as any[] | undefined;
+          if (!Array.isArray(lines)) return [];
+          return lines.map((li: any) => ({
+            itemCode: li.itemCode || li.ItemCode,
+            description: li.description || li.Description,
+            quantity: Number(li.quantity ?? li.Quantity ?? 0),
+            unitAmount: Number(li.unitAmount ?? li.UnitAmount ?? 0),
+            lineAmount: Number(li.lineAmount ?? li.LineAmount ?? 0),
+            taxAmount: Number(li.taxAmount ?? li.TaxAmount ?? 0),
+            accountCode: li.accountCode || li.AccountCode,
+            tracking: Array.isArray(li.tracking || li.Tracking) ? (li.tracking || li.Tracking) : undefined,
+          }));
+        })(),
       }))
       .filter((inv: any) => {
         if (!start && !end) return true;

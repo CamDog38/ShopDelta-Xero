@@ -90,32 +90,6 @@ export function StackedBarChart({
     return acc;
   }, {} as Record<string, string>);
   
-  // Toggle product visibility
-  const toggleProductVisibility = (productId: string) => {
-    setVisibleProducts(prev => ({
-      ...prev,
-      [productId]: !prev[productId]
-    }));
-  };
-  
-  // Show only one product
-  const showOnlyProduct = (productId: string) => {
-    const newVisibility = allProductIds.reduce((acc, id) => {
-      acc[id] = id === productId;
-      return acc;
-    }, {} as Record<string, boolean>);
-    setVisibleProducts(newVisibility);
-  };
-  
-  // Show all products
-  const showAllProducts = () => {
-    const newVisibility = allProductIds.reduce((acc, id) => {
-      acc[id] = true;
-      return acc;
-    }, {} as Record<string, boolean>);
-    setVisibleProducts(newVisibility);
-  };
-  
   // Handle mouse move for tooltip
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!chartRef.current) return;
@@ -166,95 +140,10 @@ export function StackedBarChart({
   const chartWidth = data.length * 100; // Each data point gets 100px width
   const minWidth = Math.max(chartWidth, Math.min(1200, window.innerWidth - 100)); // Responsive width
   
-  // Filter for product dropdown
-  const [filterValue, setFilterValue] = useState('all');
-  
-  // Handle filter change
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
-    setFilterValue(value);
-    
-    if (value === 'all') {
-      showAllProducts();
-    } else {
-      showOnlyProduct(value);
-    }
-  };
-  
   return (
     <div className="stacked-bar-chart-container">
       {title && <h4 className={styles.sectionTitle}>{title}</h4>}
       
-      <div className="stacked-bar-legend" style={{ marginBottom: '16px' }}>
-        <h4 style={{ marginBottom: '8px', fontSize: '14px', fontWeight: 600 }}>Legend:</h4>
-        <div className="stacked-bar-legend-items" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {allProductIds.map(id => {
-            const product = data.flatMap(d => d.products).find(p => p.id === id);
-            if (!product) return null;
-            
-            return (
-              <div 
-                key={id}
-                className="stacked-bar-legend-item"
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  cursor: 'pointer',
-                  opacity: visibleProducts[id] ? 1 : 0.5,
-                  padding: '6px 10px',
-                  borderRadius: '4px',
-                  backgroundColor: hoveredProduct === id ? '#f3f4f6' : '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  boxShadow: hoveredProduct === id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  transition: 'all 0.2s ease'
-                }}
-                onClick={() => toggleProductVisibility(id)}
-                onMouseEnter={() => setHoveredProduct(id)}
-                onMouseLeave={() => setHoveredProduct(null)}
-              >
-                <div 
-                  className="stacked-bar-legend-color" 
-                  style={{ 
-                    width: '14px', 
-                    height: '14px', 
-                    backgroundColor: productColors[id],
-                    borderRadius: '3px',
-                    marginRight: '8px',
-                    border: '1px solid rgba(0,0,0,0.1)'
-                  }} 
-                />
-                <span style={{ fontWeight: 500 }}>{product.title}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      
-      <div className="stacked-bar-filter" style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <span style={{ marginRight: '8px' }}>Show only</span>
-          <select 
-            value={filterValue} 
-            onChange={handleFilterChange}
-            style={{
-              padding: '8px 12px',
-              backgroundColor: '#ffffff',
-              color: '#111827',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px'
-            }}
-          >
-            <option value="all">All products</option>
-            {allProductIds.map(id => {
-              const product = data.flatMap(d => d.products).find(p => p.id === id);
-              if (!product) return null;
-              return (
-                <option key={id} value={id}>{product.title}</option>
-              );
-            })}
-          </select>
-        </div>
-      </div>
       
       <div className="line-chart-scroll-container" style={{ 
         overflowX: 'auto', 

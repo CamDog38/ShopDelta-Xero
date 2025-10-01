@@ -37,6 +37,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
     start: typeof sp.start === 'string' ? sp.start : undefined,
     end: typeof sp.end === 'string' ? sp.end : undefined,
     granularity: (typeof sp.granularity === 'string' ? (sp.granularity as any) : 'day'),
+    pages: typeof sp.pages === 'string' ? Number(sp.pages) : undefined,
+    chunk: typeof sp.chunk === 'string' ? Number(sp.chunk) : undefined,
   };
 
   let result: Awaited<ReturnType<typeof getXeroAnalytics>> | null = null;

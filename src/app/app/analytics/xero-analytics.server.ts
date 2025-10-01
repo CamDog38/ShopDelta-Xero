@@ -10,6 +10,8 @@ export type XeroAnalyticsFilters = {
   end?: string;   // YYYY-MM-DD UTC
   granularity?: Granularity;
   includePurchases?: boolean; // include ACCPAY docs
+  pages?: number;  // how many pages of invoice headers to fetch (Xero API paginates)
+  chunk?: number;  // hydrate chunk size for iDs
 };
 
 // Lightweight internal types limited to fields we actually use from the Xero SDK
@@ -162,9 +164,10 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   // --- Hydrated invoice fetch (headers + hydrate by IDs) ---
   console.log('📋 [FETCHING INVOICE HEADERS]');
   const headers: any[] = [];
-  // Fetch first page of headers; increase maxPages if needed
+  // Fetch header pages until the API returns no more (unlimited pages)
   let page = 1;
-  const maxPages = 5; // adjust if you want more pages
+  // simple throttle to ~60 requests/min (1.1s between calls)
+  const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
   // Build a Xero where clause for Date range (UTC). Xero expects DateTime(Y,M,D)
   function xeroDateTime(d: Date) {
     return `DateTime(${d.getUTCFullYear()},${d.getUTCMonth()+1},${d.getUTCDate()})`;
@@ -178,7 +181,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }
   const where = whereParts.join(" && ") || undefined;
   console.log('🧩 [XERO WHERE]', where);
-  for (let p = 0; p < Math.max(1, maxPages); p++) {
+  while (true) {
     const res: any = await requestWithRetry(() => (xero.accountingApi as any).getInvoices(
       session.tenantId,
       undefined, // ifModifiedSince
@@ -194,15 +197,19 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     if (!Array.isArray(list) || list.length === 0) break;
     headers.push(...list);
     page += 1;
+    // throttle between page fetches
+    await sleep(1100);
   }
-  console.log('📋 [HEADERS FETCHED]', { count: headers.length, pages: page - 1 });
+  const pagesFetched = page - 1;
+  console.log('📋 [HEADERS FETCHED]', { count: headers.length, pages: pagesFetched, unlimited: true });
 
   // Helper to get ID and normalize responses
   const getId = (inv: any) => inv?.InvoiceID || inv?.invoiceID;
   const norm = (obj: any) => obj?.body?.invoices ?? obj?.body?.Invoices ?? [];
 
   // Hydrate in chunks by IDs (Xero SDK expects iDs as string[])
-  const chunkSize = 50;
+  // Cap chunk to ~30–40 per call to respect rate limits; default 40
+  const chunkSize = Math.max(1, Math.min(Number(input.chunk ?? 40), 40));
   let fetchedAll: InvoiceLite[] = headers as unknown as InvoiceLite[];
   if (headers.length) {
     const ids = headers.map(getId).filter(Boolean);
@@ -229,6 +236,8 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
         console.error('[analytics] hydrate chunk failed', { size: c.length, err: err?.message, status: err?.response?.statusCode });
         throw err;
       }
+      // throttle between hydrate calls
+      await sleep(1100);
     }
     // Merge hydrated back over headers by ID
     const byId = new Map(hydrated.map((x: any) => [getId(x), x]));

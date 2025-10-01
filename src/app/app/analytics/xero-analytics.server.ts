@@ -9,6 +9,7 @@ export type XeroAnalyticsFilters = {
   start?: string; // YYYY-MM-DD UTC
   end?: string;   // YYYY-MM-DD UTC
   granularity?: Granularity;
+  includePurchases?: boolean; // include ACCPAY docs
 };
 
 // Lightweight internal types limited to fields we actually use from the Xero SDK
@@ -156,19 +157,32 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }
 
   const { start, end, granularity, preset } = normalizeRange(input);
-  console.log('📅 [DATE RANGE]', { preset, start: start.toISOString(), end: end.toISOString(), granularity });
+  console.log('📅 [DATE RANGE]', { preset, start: start.toISOString(), end: end.toISOString(), granularity, includePurchases: !!input.includePurchases });
 
   // --- Hydrated invoice fetch (headers + hydrate by IDs) ---
   console.log('📋 [FETCHING INVOICE HEADERS]');
   const headers: any[] = [];
   // Fetch first page of headers; increase maxPages if needed
   let page = 1;
-  const maxPages = 1; // adjust if you want more pages
+  const maxPages = 5; // adjust if you want more pages
+  // Build a Xero where clause for Date range (UTC). Xero expects DateTime(Y,M,D)
+  function xeroDateTime(d: Date) {
+    return `DateTime(${d.getUTCFullYear()},${d.getUTCMonth()+1},${d.getUTCDate()})`;
+  }
+  const whereParts: string[] = [];
+  if (start) whereParts.push(`Date >= ${xeroDateTime(start)}`);
+  if (end) whereParts.push(`Date <= ${xeroDateTime(end)}`);
+  // Sales only by default; allow purchases when includePurchases is true
+  if (!input.includePurchases) {
+    whereParts.push(`(Type=="ACCREC" OR Type=="ACCRECCREDIT")`);
+  }
+  const where = whereParts.join(" && ") || undefined;
+  console.log('🧩 [XERO WHERE]', where);
   for (let p = 0; p < Math.max(1, maxPages); p++) {
     const res: any = await requestWithRetry(() => (xero.accountingApi as any).getInvoices(
       session.tenantId,
       undefined, // ifModifiedSince
-      undefined, // where
+      where,     // where
       undefined, // order
       undefined, // iDs
       undefined, // invoiceNumbers
@@ -221,24 +235,84 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
     fetchedAll = headers.map((h: any) => byId.get(getId(h)) || h) as unknown as InvoiceLite[];
   }
   console.log('📋 [INVOICES FETCHED HYDRATED]', fetchedAll.length);
+
+  // Diagnostics: summarize structure of hydrated invoices
+  try {
+    const liLower = fetchedAll.filter((inv: any) => Array.isArray(inv?.lineItems) && inv.lineItems.length > 0).length;
+    const liUpper = fetchedAll.filter((inv: any) => Array.isArray(inv?.LineItems) && inv.LineItems.length > 0).length;
+    const noLI = fetchedAll.filter((inv: any) => !Array.isArray(inv?.lineItems) && !Array.isArray(inv?.LineItems)).length;
+    const byType = fetchedAll.reduce<Record<string, number>>((acc, inv: any) => {
+      const t = String(inv?.type || inv?.Type || '').toUpperCase();
+      acc[t] = (acc[t] || 0) + 1; return acc;
+    }, {});
+    const byStatus = fetchedAll.reduce<Record<string, number>>((acc, inv: any) => {
+      const s = String(inv?.status || inv?.Status || '').toUpperCase();
+      acc[s] = (acc[s] || 0) + 1; return acc;
+    }, {});
+    const dates = fetchedAll.map((inv: any) => inv?.date || inv?.Date).filter(Boolean).map((d: string) => new Date(d).getTime());
+    const minDt = dates.length ? new Date(Math.min(...dates)).toISOString() : undefined;
+    const maxDt = dates.length ? new Date(Math.max(...dates)).toISOString() : undefined;
+    console.log('🧾 [HYDRATE SUMMARY]', { liLower, liUpper, noLI, byType, byStatus, minDt, maxDt });
+    if (fetchedAll[0]) {
+      const sample = fetchedAll[0] as any;
+      console.log('🔎 [SAMPLE INVOICE KEYS]', Object.keys(sample).slice(0, 40));
+      const sampleItems = (sample.lineItems || sample.LineItems || []).slice(0, 2);
+      console.log('🔎 [SAMPLE LINE ITEMS]', sampleItems.map((li: any) => ({
+        itemCode: li?.itemCode ?? li?.ItemCode,
+        description: li?.description ?? li?.Description,
+        quantity: li?.quantity ?? li?.Quantity,
+        unitAmount: li?.unitAmount ?? li?.UnitAmount,
+        lineAmount: li?.lineAmount ?? li?.LineAmount,
+        taxAmount: li?.taxAmount ?? li?.TaxAmount,
+      })));
+    }
+  } catch (e) {
+    console.warn('⚠️ [HYDRATE SUMMARY FAILED]', (e as any)?.message);
+  }
   let excludedNonSales = 0;
   let excludedStatus = 0;
+  // Quick distribution before filtering
+  try {
+    const typeDist = fetchedAll.reduce<Record<string, number>>((acc, inv: any) => {
+      const t = String(inv?.type || inv?.Type || '').toUpperCase();
+      acc[t] = (acc[t] || 0) + 1; return acc;
+    }, {});
+    const statusDist = fetchedAll.reduce<Record<string, number>>((acc, inv: any) => {
+      const s = String(inv?.status || inv?.Status || '').toUpperCase();
+      acc[s] = (acc[s] || 0) + 1; return acc;
+    }, {});
+    console.log('🧮 [PRE-FILTER DISTRIBUTION]', { typeDist, statusDist });
+  } catch {}
+
+  // Filter to in-range, good-type/status invoices; log reasons
   const invoices = fetchedAll.filter((inv) => {
-    const d = inv.date;
+    const d = (inv as any).date ?? (inv as any).Date;
     const dt = d ? new Date(d) : null;
     if (!dt) return false;
     // Only include sales invoices and credit notes (Accounts Receivable)
-    const t = (inv.type || '').toUpperCase();
+    const t = String((inv as any).type ?? (inv as any).Type ?? '').toUpperCase();
     const isSales = t === 'ACCREC' || t === 'ACCRECCREDIT' || !inv.type;
-    if (!isSales) { excludedNonSales++; return false; }
-    const status = (inv.status || '').toUpperCase();
+    const isPurchase = t === 'ACCPAY';
+    const typeOk = isSales || (!!input.includePurchases && isPurchase);
+    if (!typeOk) { excludedNonSales++; return false; }
+    const status = String((inv as any).status ?? (inv as any).Status ?? '').toUpperCase();
     const isGoodStatus = status === 'AUTHORISED' || status === 'PAID' || status === '';
     if (!isGoodStatus) { excludedStatus++; return false; }
     return dt >= start && dt <= end;
   });
   console.log('✅ [INVOICES FILTERED]', { included: invoices.length, excludedNonSales, excludedStatus });
+  if (invoices.length === 0) {
+    // Provide additional hints if no invoices are in range
+    const allDates = fetchedAll.map((inv) => inv.date).filter(Boolean) as string[];
+    console.log('ℹ️ [NO INVOICES IN RANGE HINTS]', {
+      totalFetched: fetchedAll.length,
+      sampleDates: allDates.slice(0, 5),
+      filterStart: start.toISOString(),
+      filterEnd: end.toISOString(),
+    });
+  }
 
-  const currency = invoices[0]?.currencyCode;
+  const currency = (invoices[0] as any)?.currencyCode ?? (invoices[0] as any)?.CurrencyCode;
   let inferredQtyLines = 0;
   let creditCount = 0;
   let creditQty = 0;
@@ -310,7 +384,7 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
       number: inv.invoiceNumber,
       status: inv.status,
       total: Number(inv.total ?? 0),
-      currency: inv.currencyCode,
+      currency: (inv as any).currencyCode ?? (inv as any).CurrencyCode,
       date: inv.date ? fmtYMD(new Date(inv.date)) : undefined,
     }));
 

@@ -148,18 +148,27 @@ export async function GET(request: Request) {
       const hydrated: AnyInv[] = [];
       for (const c of chunks) {
         // important the param is iDs exactly as per SDK typing
-        const resp = await xero.accountingApi.getInvoices(
-          session.tenantId,
-          undefined,
-          undefined,
-          undefined,
-          c.join(','),            // iDs
-          undefined,
-          undefined,
-          undefined,
-          undefined
-        );
-        hydrated.push(...norm(resp));
+        try {
+          // The Xero SDK expects iDs as a string[] (GUIDs), not a CSV string
+          const resp = await xero.accountingApi.getInvoices(
+            session.tenantId,
+            undefined,
+            undefined,
+            undefined,
+            c,                    // iDs as string[]
+            undefined,
+            undefined,
+            undefined,
+            undefined
+          );
+          const n = norm(resp);
+          // lightweight debug signal in server logs
+          console.log(`[xero-invoices] hydrated chunk size=${c.length} received=${n.length}`);
+          hydrated.push(...n);
+        } catch (err: any) {
+          console.error('[xero-invoices] hydrate chunk failed', { size: c.length, err: err?.message, status: err?.response?.statusCode });
+          throw err; // bubble up so the API reports the failure
+        }
       }
 
       // merge hydrated back over headers

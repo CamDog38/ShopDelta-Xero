@@ -82,6 +82,7 @@ type CacheEntry = { value: XeroAnalyticsResult; expires: number };
 const ANALYTICS_CACHE = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const CACHE_MAX = 50;
+const CACHE_METRICS = { hits: 0, misses: 0, stores: 0, evictions: 0, expirations: 0 };
 
 function analyticsCacheKey(tenantId: string, input: XeroAnalyticsFilters & { start: string; end: string; granularity: Granularity }) {
   // Only include fields that affect the dataset. UI toggles (view/chart/metric) are excluded.
@@ -98,19 +99,28 @@ function analyticsCacheKey(tenantId: string, input: XeroAnalyticsFilters & { sta
 function getFromCache(key: string): XeroAnalyticsResult | null {
   const hit = ANALYTICS_CACHE.get(key);
   if (!hit) return null;
-  if (Date.now() > hit.expires) { ANALYTICS_CACHE.delete(key); return null; }
+  if (Date.now() > hit.expires) { 
+    ANALYTICS_CACHE.delete(key);
+    CACHE_METRICS.expirations++;
+    console.log('🟠 [ANALYTICS CACHE EXPIRED]', { size: ANALYTICS_CACHE.size, metrics: CACHE_METRICS });
+    return null; 
+  }
   // LRU touch
   ANALYTICS_CACHE.delete(key);
   ANALYTICS_CACHE.set(key, hit);
+  CACHE_METRICS.hits++;
+  console.log('🟢 [ANALYTICS CACHE HIT]', { size: ANALYTICS_CACHE.size, ttlMs: hit.expires - Date.now(), metrics: CACHE_METRICS });
   return hit.value;
 }
 
 function setInCache(key: string, value: XeroAnalyticsResult) {
   if (ANALYTICS_CACHE.size >= CACHE_MAX) {
     const first = ANALYTICS_CACHE.keys().next().value as string | undefined;
-    if (first) ANALYTICS_CACHE.delete(first);
+    if (first) { ANALYTICS_CACHE.delete(first); CACHE_METRICS.evictions++; console.log('🧹 [ANALYTICS CACHE EVICT]', { key: first, size: ANALYTICS_CACHE.size, metrics: CACHE_METRICS }); }
   }
   ANALYTICS_CACHE.set(key, { value, expires: Date.now() + CACHE_TTL_MS });
+  CACHE_METRICS.stores++;
+  console.log('🟡 [ANALYTICS CACHE STORE]', { size: ANALYTICS_CACHE.size, ttlMs: CACHE_TTL_MS, metrics: CACHE_METRICS });
 }
 
 function startOfWeekUTC(d: Date) {

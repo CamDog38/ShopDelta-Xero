@@ -77,6 +77,42 @@ export type XeroAnalyticsResult = {
   monthlyProduct: Array<{ key: string; per: Record<string, { title: string; qty: number; sales: number }> }>;
 };
 
+// Simple per-instance in-memory cache to avoid duplicate API calls for the same filters
+type CacheEntry = { value: XeroAnalyticsResult; expires: number };
+const ANALYTICS_CACHE = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_MAX = 50;
+
+function analyticsCacheKey(tenantId: string, input: XeroAnalyticsFilters & { start: string; end: string; granularity: Granularity }) {
+  // Only include fields that affect the dataset. UI toggles (view/chart/metric) are excluded.
+  return JSON.stringify({
+    tenantId,
+    preset: input.preset,
+    start: input.start,
+    end: input.end,
+    granularity: input.granularity,
+    includePurchases: !!input.includePurchases,
+  });
+}
+
+function getFromCache(key: string): XeroAnalyticsResult | null {
+  const hit = ANALYTICS_CACHE.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expires) { ANALYTICS_CACHE.delete(key); return null; }
+  // LRU touch
+  ANALYTICS_CACHE.delete(key);
+  ANALYTICS_CACHE.set(key, hit);
+  return hit.value;
+}
+
+function setInCache(key: string, value: XeroAnalyticsResult) {
+  if (ANALYTICS_CACHE.size >= CACHE_MAX) {
+    const first = ANALYTICS_CACHE.keys().next().value as string | undefined;
+    if (first) ANALYTICS_CACHE.delete(first);
+  }
+  ANALYTICS_CACHE.set(key, { value, expires: Date.now() + CACHE_TTL_MS });
+}
+
 function startOfWeekUTC(d: Date) {
   const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
   const dow = dt.getUTCDay();
@@ -159,6 +195,12 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   }
 
   const { start, end, granularity, preset } = normalizeRange(input);
+  const key = analyticsCacheKey(session.tenantId, { ...input, start: fmtYMD(start), end: fmtYMD(end), granularity });
+  const cached = getFromCache(key);
+  if (cached) {
+    console.log('🟢 [ANALYTICS CACHE HIT]');
+    return cached;
+  }
   console.log('📅 [DATE RANGE]', { preset, start: start.toISOString(), end: end.toISOString(), granularity, includePurchases: !!input.includePurchases });
 
   // --- Hydrated invoice fetch (headers + hydrate by IDs) ---

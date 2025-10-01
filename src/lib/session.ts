@@ -19,7 +19,10 @@ export type XeroSession = {
 };
 
 // File-backed store for dev to survive HMR/process changes. Replace with DB/redis in production.
-const storeDir = path.join(process.cwd(), '.next', 'xero-sessions');
+// In serverless (cookie-mode), avoid writing to app directory; /tmp is writable if ever needed.
+const storeDir = (process.env.VERCEL === '1' || process.env.USE_COOKIE_SESSION === 'true')
+  ? (process.env.XERO_SESSION_DIR || path.join('/tmp', 'xero-sessions'))
+  : path.join(process.cwd(), '.next', 'xero-sessions');
 function ensureStoreDir() {
   try {
     fs.mkdirSync(storeDir, { recursive: true });
@@ -163,6 +166,10 @@ export async function getTenantId(): Promise<string | null> {
 export function getSessionForTenant(tenantId: string): XeroSession | null {
   // Scan the store directory to find a matching tenant. For dev diagnostics only.
   try {
+    if (isCookieMode()) {
+      // In serverless/cookie mode there is no file store; skip scanning.
+      return null;
+    }
     ensureStoreDir();
     const files = fs.readdirSync(storeDir);
     for (const f of files) {

@@ -9,6 +9,7 @@ import { StackedBarChart } from './StackedBarChart';
 import { LineChart } from './LineChart';
 import { InteractiveBarChart } from './InteractiveBarChart';
 import { Suspense } from 'react';
+import ProductMultiSelect from './ProductMultiSelect';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   const compareScope = (typeof sp.compareScope === 'string' ? sp.compareScope : 'total') as 'total' | 'product';
   const compareA = (typeof sp.compareA === 'string' ? sp.compareA : ''); // YYYY-MM
   const compareB = (typeof sp.compareB === 'string' ? sp.compareB : ''); // YYYY-MM
+  const selectedProducts = Array.isArray((sp as any).products)
+    ? (sp as any).products as string[]
+    : (typeof (sp as any).products === 'string' ? [(sp as any).products as string] : []);
 
   const filters: XeroAnalyticsFilters = {
     preset: (typeof sp.preset === 'string' ? sp.preset : 'last30') as any,
@@ -118,6 +122,12 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                   <option value="month">Monthly</option>
                 </select>
               </div>
+              {(result?.productLegend?.length ?? 0) > 0 && (
+                <ProductMultiSelect
+                  options={(result?.productLegend || []).map(p => ({ id: p.id, title: p.title }))}
+                  selected={selectedProducts}
+                />
+              )}
               <div className="analytics-apply">
                 <button className={styles.primaryBtn} type="submit">Apply Filters</button>
               </div>
@@ -233,15 +243,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                   <div className="analytics-chart-scroll">
                     <Suspense fallback={<div>Loading stacked bar chart...</div>}>
                       <StackedBarChart
-                        data={(result?.seriesProduct || []).map(series => ({
-                          key: series.key,
-                          label: series.label,
-                          products: Object.entries(series.per).map(([id, data]) => ({
-                            id,
-                            title: data.title,
-                            value: (metric === 'sales' ? data.sales : (data as any).qty) ?? 0
-                          }))
-                        }))}
+                        data={(result?.seriesProduct || []).map(series => {
+                          const allow = (selectedProducts?.length ?? 0) > 0 ? new Set(selectedProducts) : undefined;
+                          const products = Object.entries(series.per)
+                            .filter(([id]) => !allow || allow.has(id))
+                            .map(([id, data]) => ({
+                              id,
+                              title: (data as any).title,
+                              value: (metric === 'sales' ? (data as any).sales : (data as any).qty) ?? 0
+                            }));
+                          return { key: series.key, label: series.label, products };
+                        })}
                         title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product`}
                         yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
                         xAxisLabel="Time Period"
@@ -260,15 +272,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                   <div>
                     <Suspense fallback={<div>Loading line chart...</div>}>
                       <LineChart
-                        data={(result?.seriesProduct || []).map(series => ({
-                          key: series.key,
-                          label: series.label,
-                          products: Object.entries(series.per).map(([id, data]) => ({
-                            id,
-                            title: data.title,
-                            value: metric === 'sales' ? data.sales : data.qty
-                          }))
-                        }))}
+                        data={(result?.seriesProduct || []).map(series => {
+                          const allow = (selectedProducts?.length ?? 0) > 0 ? new Set(selectedProducts) : undefined;
+                          const products = Object.entries(series.per)
+                            .filter(([id]) => !allow || allow.has(id))
+                            .map(([id, data]) => ({
+                              id,
+                              title: (data as any).title,
+                              value: metric === 'sales' ? (data as any).sales : (data as any).qty
+                            }));
+                          return { key: series.key, label: series.label, products };
+                        })}
                         title={`${metric === 'sales' ? 'Sales' : 'Quantity'} by Product Over Time`}
                         yAxisLabel={metric === 'sales' ? 'Sales' : 'Quantity'}
                         xAxisLabel="Time Period"
@@ -290,23 +304,16 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               {chartScope === 'product' ? (
                 <Suspense fallback={<div>Loading product data table...</div>}>
                   {/* Product header chips */}
-                  <div className="analytics-chart-scroll" style={{ marginBottom: 12 }}>
-                    <div className="analytics-legend-chips">
-                      {(result?.productLegend || []).map(p => (
-                        <div key={p.id} className="analytics-legend-chip">
-                          <span className="analytics-legend-swatch" style={{ background: '#0ea5e9' }} />
-                          <span>{p.title}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                   <EnhancedTable
                     data={(result?.seriesProduct || []).map(row => {
                       const rowData: Record<string, any> = { timePeriod: row.label };
+                      const allow = (selectedProducts?.length ?? 0) > 0 ? new Set(selectedProducts) : undefined;
                       (result?.productLegend || []).forEach(p => {
-                        rowData[p.id] = metric === 'sales' 
-                          ? (row.per[p.id]?.sales ?? 0) 
-                          : (row.per[p.id]?.qty ?? 0);
+                        if (!allow || allow.has(p.id)) {
+                          rowData[p.id] = metric === 'sales' 
+                            ? (row.per[p.id]?.sales ?? 0) 
+                            : (row.per[p.id]?.qty ?? 0);
+                        }
                       });
                       return rowData;
                     })}
@@ -319,14 +326,16 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         align: 'left',
                         width: '150px'
                       },
-                      ...(result?.productLegend || []).map(p => ({
-                        id: p.id,
-                        header: p.title,
-                        accessorKey: p.id,
-                        sortable: true,
-                        align: 'right' as const,
-                        format: (metric === 'sales' ? 'money' : 'number') as 'money' | 'number'
-                      }))
+                      ...((result?.productLegend || [])
+                        .filter(p => (selectedProducts?.length ?? 0) === 0 || selectedProducts.includes(p.id))
+                        .map(p => ({
+                          id: p.id,
+                          header: p.title,
+                          accessorKey: p.id,
+                          sortable: true,
+                          align: 'right' as const,
+                          format: (metric === 'sales' ? 'money' : 'number') as 'money' | 'number'
+                        })))
                     ]}
                     keyField="timePeriod"
                     title="Products by Time Period"

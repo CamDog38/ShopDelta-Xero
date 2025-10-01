@@ -45,6 +45,7 @@ type XeroClientLike = {
   readTokenSet?: () => Record<string, unknown> | Promise<Record<string, unknown> | undefined> | undefined;
   tokenSet?: Record<string, unknown>;
   accountingApi: {
+    // Keep a minimal signature for simple calls; use `as any` for advanced parameters (where/page/iDs/etc.)
     getInvoices: (tenantId: string) => Promise<{ body?: { invoices?: unknown[] } }>;
     getItems: (tenantId: string) => Promise<{ body?: { items?: unknown[] } }>;
   };
@@ -157,12 +158,69 @@ export async function getXeroAnalytics(input: XeroAnalyticsFilters): Promise<Xer
   const { start, end, granularity, preset } = normalizeRange(input);
   console.log('📅 [DATE RANGE]', { preset, start: start.toISOString(), end: end.toISOString(), granularity });
 
-  // Fetch invoices within a broad range. Xero API doesn't support complex filters in all SDK versions,
-  // so we fetch a reasonable number and filter in memory for the example.
-  console.log('📋 [FETCHING INVOICES]');
-  const invRes = await requestWithRetry(() => xero.accountingApi.getInvoices(session.tenantId));
-  const fetchedAll = ((invRes.body?.invoices ?? []) as unknown as InvoiceLite[]);
-  console.log('📋 [INVOICES FETCHED]', fetchedAll.length);
+  // --- Hydrated invoice fetch (headers + hydrate by IDs) ---
+  console.log('📋 [FETCHING INVOICE HEADERS]');
+  const headers: any[] = [];
+  // Fetch first page of headers; increase maxPages if needed
+  let page = 1;
+  const maxPages = 1; // adjust if you want more pages
+  for (let p = 0; p < Math.max(1, maxPages); p++) {
+    const res: any = await requestWithRetry(() => (xero.accountingApi as any).getInvoices(
+      session.tenantId,
+      undefined, // ifModifiedSince
+      undefined, // where
+      undefined, // order
+      undefined, // iDs
+      undefined, // invoiceNumbers
+      undefined, // contactIDs
+      undefined, // statuses
+      page       // page
+    ));
+    const list = (res?.body?.invoices ?? res?.body?.Invoices ?? []) as any[];
+    if (!Array.isArray(list) || list.length === 0) break;
+    headers.push(...list);
+    page += 1;
+  }
+  console.log('📋 [HEADERS FETCHED]', { count: headers.length, pages: page - 1 });
+
+  // Helper to get ID and normalize responses
+  const getId = (inv: any) => inv?.InvoiceID || inv?.invoiceID;
+  const norm = (obj: any) => obj?.body?.invoices ?? obj?.body?.Invoices ?? [];
+
+  // Hydrate in chunks by IDs (Xero SDK expects iDs as string[])
+  const chunkSize = 50;
+  let fetchedAll: InvoiceLite[] = headers as unknown as InvoiceLite[];
+  if (headers.length) {
+    const ids = headers.map(getId).filter(Boolean);
+    const chunks: string[][] = [];
+    for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize));
+    const hydrated: any[] = [];
+    for (const c of chunks) {
+      try {
+        const resp: any = await requestWithRetry(() => (xero.accountingApi as any).getInvoices(
+          session.tenantId,
+          undefined,
+          undefined,
+          undefined,
+          c, // iDs as string[]
+          undefined,
+          undefined,
+          undefined,
+          undefined
+        ));
+        const n = norm(resp);
+        console.log(`[analytics] hydrated chunk size=${c.length} received=${Array.isArray(n) ? n.length : 0}`);
+        hydrated.push(...n);
+      } catch (err: any) {
+        console.error('[analytics] hydrate chunk failed', { size: c.length, err: err?.message, status: err?.response?.statusCode });
+        throw err;
+      }
+    }
+    // Merge hydrated back over headers by ID
+    const byId = new Map(hydrated.map((x: any) => [getId(x), x]));
+    fetchedAll = headers.map((h: any) => byId.get(getId(h)) || h) as unknown as InvoiceLite[];
+  }
+  console.log('📋 [INVOICES FETCHED HYDRATED]', fetchedAll.length);
   let excludedNonSales = 0;
   let excludedStatus = 0;
   const invoices = fetchedAll.filter((inv) => {

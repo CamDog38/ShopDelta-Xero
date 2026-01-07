@@ -10,6 +10,7 @@ import { LineChart } from './LineChart';
 import { InteractiveBarChart } from './InteractiveBarChart';
 import { Suspense } from 'react';
 import ProductMultiSelect from './ProductMultiSelect';
+import ExportExcelButton from './ExportExcelButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -143,11 +144,14 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
           {/* View tabs */}
           <div className={`${styles.card} analytics-card`} style={{ padding: 8 }}>
-            <div className="analytics-segmented">
-              <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart' }).toString()}`} className={view === 'chart' ? '' : 'analytics-muted'}>📊 Charts</a>
-              <a href={`?${new URLSearchParams({ ...sp as any, view: 'table' }).toString()}`} className={view === 'table' ? '' : 'analytics-muted'}>📋 Data Table</a>
-              <a href={`?${new URLSearchParams({ ...sp as any, view: 'summary' }).toString()}`} className={view === 'summary' ? '' : 'analytics-muted'}>📑 Summary</a>
-              <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare' }).toString()}`} className={view === 'compare' ? '' : 'analytics-muted'}>🔄 Compare</a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className="analytics-segmented" style={{ flex: 1 }}>
+                <a href={`?${new URLSearchParams({ ...sp as any, view: 'chart' }).toString()}`} className={view === 'chart' ? '' : 'analytics-muted'}>📊 Charts</a>
+                <a href={`?${new URLSearchParams({ ...sp as any, view: 'table' }).toString()}`} className={view === 'table' ? '' : 'analytics-muted'}>📋 Data Table</a>
+                <a href={`?${new URLSearchParams({ ...sp as any, view: 'summary' }).toString()}`} className={view === 'summary' ? '' : 'analytics-muted'}>📑 Summary</a>
+                <a href={`?${new URLSearchParams({ ...sp as any, view: 'compare' }).toString()}`} className={view === 'compare' ? '' : 'analytics-muted'}>🔄 Compare</a>
+              </div>
+              <ExportExcelButton className={styles.primaryBtn} />
             </div>
           </div>
 
